@@ -19,7 +19,7 @@
 // Imports: component.mjs, lifecycle.mjs, @esmj/signals, easy-uid
 // ---------------------------------------------------------------------------
 
-import { computed, createSignal, effect, untrack } from '@esmj/signals';
+import { computed, createSignal, effect } from '@esmj/signals';
 import uid from 'easy-uid';
 
 import { isComponentInstance } from './componentInstance.mjs';

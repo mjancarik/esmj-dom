@@ -2,10 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { createComponentInstance } from '../componentInstance.mjs';
-import { createElement } from '../createElement.mjs';
 import { If } from '../If.mjs';
-import { cleanupTree, onMount, onUnmount } from '../lifecycle.mjs';
-import { setInternalContext } from '../runtime.mjs';
+import { onUnmount } from '../lifecycle.mjs';
 
 // ---------------------------------------------------------------------------
 // Basic rendering
@@ -115,7 +113,7 @@ describe('If — branch switching', () => {
       null,
     );
 
-    const container = If(() => cond.get(), thenInstance);
+    const _container = If(() => cond.get(), thenInstance);
     await afterFlush();
     const countAfterMount = renderCount;
 
@@ -176,7 +174,7 @@ describe('If — owned component instance', () => {
       null,
     );
 
-    const container = If(() => cond.get(), thenInstance);
+    const _container = If(() => cond.get(), thenInstance);
     await afterFlush();
     await new Promise((r) => queueMicrotask(r));
 
@@ -199,7 +197,7 @@ describe('If — owned component instance', () => {
       null,
     );
 
-    const container = If(() => cond.get(), thenInstance);
+    const _container = If(() => cond.get(), thenInstance);
     await afterFlush();
     assert.equal(callCount, 1);
 

@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { afterFlush, effect } from '@esmj/signals';
+import { afterFlush } from '@esmj/signals';
 
 import {
-  addDisposer,
   afterRender,
   cleanupTree,
   disposeComponent,
@@ -41,7 +40,7 @@ function withContext(id, fn) {
 // ---------------------------------------------------------------------------
 
 describe('onMount', () => {
-  it('warns when called outside a component context', (t) => {
+  it('warns when called outside a component context', (_t) => {
     const messages = [];
     const orig = console.warn;
     console.warn = (...args) => messages.push(args.join(' '));

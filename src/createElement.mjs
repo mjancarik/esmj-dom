@@ -10,18 +10,11 @@ import { effect } from '@esmj/signals';
 
 import {
   createComponentInstance,
-  isClassComponent,
   isComponentInstance,
   mountComponentInstance,
 } from './componentInstance.mjs';
 import { cleanupTree } from './lifecycle.mjs';
-import {
-  addDisposer,
-  getContext,
-  getContextFromElement,
-  getInternalContext,
-  withContext,
-} from './runtime.mjs';
+import { addDisposer, getInternalContext, withContext } from './runtime.mjs';
 
 // ---------------------------------------------------------------------------
 // Prop name aliases

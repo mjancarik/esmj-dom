@@ -186,10 +186,10 @@ describe('mountComponentInstance', () => {
   });
 
   it('calls onMount hooks asynchronously via microtask', async () => {
-    const mountCalled = false;
-    const fn = () => {
+    const _mountCalled = false;
+    const _fn = () => {
       // Register onMount from inside the component
-      import('../lifecycle.mjs').then(({ onMount }) => {
+      import('../lifecycle.mjs').then(() => {
         // onMount won't work here — we need it called during $constructor
       });
       return document.createElement('div');

@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { renderChild } from '../createElement.mjs';
 import { Each } from '../Each.mjs';
-import { onMount, onUnmount } from '../lifecycle.mjs';
+import { onUnmount } from '../lifecycle.mjs';
 
 // ---------------------------------------------------------------------------
 // Initial render
@@ -107,7 +107,7 @@ describe('Each — removing items', () => {
   });
 
   it('calls onUnmount for removed component items', async () => {
-    let unmounted = false;
+    let _unmounted = false;
 
     const items = createSignal([{ id: 1 }]);
     const container = Each(
@@ -115,7 +115,7 @@ describe('Each — removing items', () => {
       (item) => item.id,
       () => {
         onUnmount(() => {
-          unmounted = true;
+          _unmounted = true;
         });
         return document.createElement('li');
       },
@@ -142,7 +142,7 @@ describe('Each — updating items in-place', () => {
     let renderCount = 0;
     const items = createSignal([{ id: 1, text: 'first' }]);
 
-    const container = Each(
+    const _container = Each(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {

@@ -3,9 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
-import uid from 'easy-uid';
 
 import {
   Component,
@@ -16,7 +15,6 @@ import {
   If,
   mount,
   onMount,
-  onUnmount,
   Show,
   setContext,
   useRef,

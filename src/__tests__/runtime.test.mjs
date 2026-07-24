@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { computed, createSignal } from '@esmj/signals';
+import { createSignal } from '@esmj/signals';
 
 import {
   createContext,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
-import { afterFlush, computed, createSignal, effect } from '@esmj/signals';
+import { describe, it } from 'node:test';
+import { afterFlush, computed, createSignal } from '@esmj/signals';
 import { createElement, isSignalLike, renderChild } from '../createElement.mjs';
 import { useRef } from '../runtime.mjs';
 
@@ -236,7 +236,7 @@ describe('createElement — events', () => {
 describe('createElement — reactive attributes', () => {
   it('tracks signal-bound attribute', async () => {
     const sig = createSignal('initial');
-    const disposers = [];
+    const _disposers = [];
     const el = createElement('div', { 'data-val': sig });
     assert.equal(el.getAttribute('data-val'), 'initial');
 
