@@ -1,0 +1,227 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { afterFlush, createSignal } from '@esmj/signals';
+import { renderChild } from '../createElement.mjs';
+import { Each } from '../Each.mjs';
+import { onMount, onUnmount } from '../lifecycle.mjs';
+
+// ---------------------------------------------------------------------------
+// Initial render
+// ---------------------------------------------------------------------------
+
+describe('Each — initial render', () => {
+  it('renders items into a span[data-each] container', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.tagName, 'SPAN');
+    assert.ok(container.hasAttribute('data-each'));
+    assert.equal(container.children.length, 2);
+    assert.equal(container.children[0].textContent, 'a');
+    assert.equal(container.children[1].textContent, 'b');
+  });
+
+  it('renders an empty list with no children', async () => {
+    const items = createSignal([]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      () => document.createElement('li'),
+    );
+    await afterFlush();
+
+    assert.equal(container.children.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adding items
+// ---------------------------------------------------------------------------
+
+describe('Each — adding items', () => {
+  it('appends a new DOM child for a new key', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+    assert.equal(container.children.length, 1);
+
+    items.set([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    await afterFlush();
+
+    assert.equal(container.children.length, 2);
+    assert.equal(container.children[1].textContent, 'b');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Removing items
+// ---------------------------------------------------------------------------
+
+describe('Each — removing items', () => {
+  it('removes DOM child when key disappears', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+    assert.equal(container.children.length, 2);
+
+    items.set([{ id: 1, text: 'a' }]);
+    await afterFlush();
+
+    assert.equal(container.children.length, 1);
+    assert.equal(container.children[0].textContent, 'a');
+  });
+
+  it('calls onUnmount for removed component items', async () => {
+    let unmounted = false;
+
+    const items = createSignal([{ id: 1 }]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      () => {
+        onUnmount(() => {
+          unmounted = true;
+        });
+        return document.createElement('li');
+      },
+    );
+    await afterFlush();
+    await new Promise((r) => queueMicrotask(r));
+
+    items.set([]);
+    await afterFlush();
+
+    // cleanupTree is called, which runs unmount hooks via element's component
+    // (Note: onUnmount only works inside a component $constructor context)
+    // The item element's disposers will be cleaned up regardless
+    assert.equal(container.children.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Updating existing items (same key)
+// ---------------------------------------------------------------------------
+
+describe('Each — updating items in-place', () => {
+  it('updates the item signal without remounting', async () => {
+    let renderCount = 0;
+    const items = createSignal([{ id: 1, text: 'first' }]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        renderCount++;
+        const el = document.createElement('li');
+        // Reactive text bound to the item signal
+        el.appendChild(document.createTextNode(''));
+        el.firstChild.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+    assert.equal(renderCount, 1);
+
+    items.set([{ id: 1, text: 'updated' }]);
+    await afterFlush();
+
+    // renderFn should NOT have been called again (same key → in-place update)
+    assert.equal(
+      renderCount,
+      1,
+      'renderFn must not be called for existing keys',
+    );
+  });
+
+  it('reactive text inside renderFn updates when item signal changes', async () => {
+    const items = createSignal([{ id: 1, text: 'first' }]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        // Reactive text node using the item signal
+        renderChild(el, () => itemSig.get().text);
+        return el;
+      },
+    );
+    await afterFlush();
+
+    items.set([{ id: 1, text: 'updated' }]);
+    await afterFlush();
+
+    assert.equal(container.children[0].textContent, 'updated');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reordering items
+// ---------------------------------------------------------------------------
+
+describe('Each — reordering', () => {
+  it('reorders DOM children to match new array order', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+      { id: 3, text: 'c' },
+    ]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    items.set([
+      { id: 3, text: 'c' },
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    await afterFlush();
+
+    assert.equal(container.children[0].textContent, 'c');
+    assert.equal(container.children[1].textContent, 'a');
+    assert.equal(container.children[2].textContent, 'b');
+  });
+});

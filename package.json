@@ -1,0 +1,84 @@
+{
+  "name": "@esmj/dom",
+  "version": "0.0.1",
+  "description": "Tiny extendable package for DOM manipulation.",
+  "keywords": [
+    "dom",
+    "manipulation"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "lint": "biome check --no-errors-on-unmatched",
+    "lint:fix": "npm run lint -- --fix --unsafe",
+    "benchmark": "node --expose-gc benchmark/benchmark.ts",
+    "dev": "node_modules/.bin/tsup --dts --watch --onSuccess 'node ./dist/index.mjs'",
+    "dev:examples": "vite examples",
+    "build:examples": "vite build examples",
+    "test": "node --test --experimental-strip-types --import ./src/__tests__/setup.mjs 'src/__tests__/**/*.test.mjs'",
+    "test:watch": "npm run test -- --watch",
+    "preversion": "npm test && npm run lint && npm run build",
+    "version": "npm run changelog && git add CHANGELOG.md",
+    "postversion": "git push && git push --tags",
+    "commit": "node_modules/.bin/git-cz",
+    "changelog": "node_modules/.bin/conventional-changelog -p angular -i CHANGELOG.md -s -r 1",
+    "build": "node_modules/.bin/tsup --dts",
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjancarik/esmj-dom.git"
+  },
+  "author": "Miroslav Jancarik",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mjancarik/esmj-dom/issues"
+  },
+  "lint-staged": {
+    "**/*.{ts,js,mjs}": "npm run lint"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "git-cz"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "homepage": "https://github.com/mjancarik/esmj-dom#readme",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.5",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "commitizen": "^4.3.2",
+    "conventional-changelog-cli": "^5.0.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "git-cz": "^4.9.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "lint-staged": "^17.2.0",
+    "tsup": "^8.5.1",
+    "vite": "^8.1.5"
+  },
+  "dependencies": {
+    "@esmj/signals": "^0.4.0",
+    "easy-uid": "^2.0.2"
+  }
+}
