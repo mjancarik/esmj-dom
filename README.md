@@ -42,12 +42,6 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
 npm install @esmj/dom
 ```
 
-`@esmj/dom` has a peer dependency on `@esmj/signals` for reactivity:
-
-```sh
-npm install @esmj/signals
-```
-
 ## Quick Start
 
 ```js
