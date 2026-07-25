@@ -1,3 +1,4 @@
+## 0.0.2 (2026-07-25)
 ## <small>0.7.2 (2026-03-13)</small>
 
 * feat: 🎸 add s.cast namespace for programmer-friendly coercion ([f2a984b](https://github.com/mjancarik/esmj-schema/commit/f2a984b))
