@@ -38,7 +38,7 @@ describe('mount', () => {
 
     assert.equal(container.textContent, 'hello world');
   });
-§
+
   it('appends when mounting into a document fragment', () => {
     const fragment = document.createDocumentFragment();
     const first = document.createElement('a');
