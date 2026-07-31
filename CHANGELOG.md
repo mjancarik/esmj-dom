@@ -1,3 +1,4 @@
+# [0.1.0](https://github.com/mjancarik/esmj-dom/compare/v0.0.2...v0.1.0) (2026-07-31)
 ## 0.0.2 (2026-07-25)
 ## <small>0.7.2 (2026-03-13)</small>
 
