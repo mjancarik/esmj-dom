@@ -225,3 +225,39 @@ describe('Each — reordering', () => {
     assert.equal(container.children[2].textContent, 'b');
   });
 });
+
+describe('Each — defensive key handling', () => {
+  it('logs and skips later duplicate keys without throwing', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 1, text: 'b' },
+    ]);
+
+    const originalConsoleError = console.error;
+    const errors = [];
+    console.error = (...args) => {
+      errors.push(args.join(' '));
+    };
+
+    try {
+      const container = Each(
+        () => items.get(),
+        (item) => item.id,
+        (itemSig) => {
+          const el = document.createElement('li');
+          el.textContent = itemSig.get().text;
+          return el;
+        },
+      );
+
+      await afterFlush();
+
+      assert.equal(container.children.length, 1);
+      assert.equal(container.children[0].textContent, 'a');
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /Each: duplicate key "1" detected/);
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+});

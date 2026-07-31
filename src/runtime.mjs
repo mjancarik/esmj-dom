@@ -7,7 +7,6 @@ import uid from 'easy-uid';
 
 export const NODE_COMPONENT = Symbol('node-component');
 export const NODE_INTERNAL = Symbol('node-internal');
-const CONTEXT_ID = Symbol('context-id');
 const KEEP_LITERAL = Symbol('keep-literal');
 
 /**
@@ -300,7 +299,7 @@ export function deepEqual(a, b) {
  * @returns {{ id: symbol, defaultValue: T }}  An opaque context descriptor.
  */
 export function createContext(defaultValue) {
-  return { id: CONTEXT_ID, defaultValue };
+  return { id: Symbol('context-id'), defaultValue };
 }
 
 /**
