@@ -24,6 +24,14 @@ export function mount(container, rootChild) {
     throw new Error('mount: container not found');
   }
 
+  if (container.childNodes.length > 0) {
+    let child = container.firstChild;
+    while (child) {
+      const next = child.nextSibling;
+      cleanupTree(child);
+      child = next;
+    }
+  }
   container.innerHTML = '';
 
   if (isComponentInstance(rootChild)) {

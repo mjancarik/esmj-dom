@@ -77,16 +77,29 @@ export function Each(itemsAccessor, keyFn, renderFn) {
 
   const dispose = effect(() => {
     const items = itemsComputed.get();
-    //const items = itemsAccessor();
-
-    const newKeys = items.map((item, index) => keyFn(item, index));
+    const uniqueItems = [];
+    const newKeys = [];
+    const seenKeys = new Set();
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const key = keyFn(item, i);
+      if (seenKeys.has(key)) {
+        console.error(
+          `Each: duplicate key "${String(key)}" detected; ignoring later item at index ${i}`,
+        );
+        continue;
+      }
+      seenKeys.add(key);
+      uniqueItems.push(item);
+      newKeys.push(key);
+    }
     const oldMap = new Map(currentEntries.map((e) => [e.key, e]));
 
     const newEntries = [];
 
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < uniqueItems.length; i++) {
       const key = newKeys[i];
-      const item = items[i];
+      const item = uniqueItems[i];
       const existing = oldMap.get(key);
 
       if (existing) {

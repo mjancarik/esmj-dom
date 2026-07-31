@@ -14,6 +14,7 @@ import { computed, effect } from '@esmj/signals';
 
 import { isComponentInstance } from './componentInstance.mjs';
 import { runMountHooks } from './lifecycle.mjs';
+import { addDisposer } from './runtime.mjs';
 
 /**
  * CSS-based conditional visibility — toggles `element.style.display` between
@@ -46,9 +47,10 @@ export function Show(condition, child) {
 
   if (element instanceof HTMLElement) {
     const conditionComputed = computed(() => !!condition());
-    effect(() => {
+    const dispose = effect(() => {
       element.style.display = conditionComputed.get() ? '' : 'none';
     });
+    addDisposer(element, dispose);
   }
 
   return element;

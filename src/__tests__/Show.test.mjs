@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { createComponentInstance } from '../componentInstance.mjs';
+import { createElement } from '../createElement.mjs';
+import { mount, unmount } from '../mount.mjs';
 import { Show } from '../Show.mjs';
 
 // ---------------------------------------------------------------------------
@@ -103,5 +105,38 @@ describe('Show — plain text child', () => {
 
     // Text nodes are not HTMLElements, so Show just returns without toggling
     assert.equal(result.textContent, 'hello');
+  });
+});
+
+describe('Show — lifecycle cleanup', () => {
+  it('disposes visibility effect when parent subtree is unmounted', async () => {
+    const visible = createSignal(true);
+    let conditionRuns = 0;
+
+    function App() {
+      return createElement('div', {}, [
+        Show(
+          () => {
+            conditionRuns++;
+            return visible.get();
+          },
+          createElement('span', { 'data-testid': 'message' }, ['message']),
+        ),
+      ]);
+    }
+
+    const container = document.createElement('div');
+    mount(container, createElement(App));
+    await afterFlush();
+
+    visible.set(false);
+    await afterFlush();
+    const runsBeforeUnmount = conditionRuns;
+
+    unmount(container);
+    visible.set(true);
+    await afterFlush();
+
+    assert.equal(conditionRuns, runsBeforeUnmount);
   });
 });
