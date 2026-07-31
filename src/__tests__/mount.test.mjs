@@ -38,6 +38,19 @@ describe('mount', () => {
 
     assert.equal(container.textContent, 'hello world');
   });
+§
+  it('appends when mounting into a document fragment', () => {
+    const fragment = document.createDocumentFragment();
+    const first = document.createElement('a');
+    first.textContent = 'link';
+
+    mount(fragment, first);
+    mount(fragment, ' tail');
+
+    assert.equal(fragment.childNodes.length, 2);
+    assert.equal(fragment.firstChild, first);
+    assert.equal(fragment.textContent, 'link tail');
+  });
 
   it('mounts a component instance', () => {
     const container = document.createElement('div');
@@ -113,6 +126,31 @@ describe('mount', () => {
     assert.equal(firstDisposed, true);
     assert.equal(container.firstChild?.tagName, 'SECTION');
     assert.equal(container.childNodes.length, 1);
+  });
+
+  it('does not cleanup existing fragment children on subsequent mounts', () => {
+    const fragment = document.createDocumentFragment();
+    let unmountCalled = false;
+
+    const first = createComponentInstance(
+      () => {
+        onUnmount(() => {
+          unmountCalled = true;
+        });
+        const link = document.createElement('a');
+        link.setAttribute('href', '/first');
+        return link;
+      },
+      {},
+      null,
+    );
+
+    mount(fragment, first);
+    mount(fragment, document.createTextNode(' tail'));
+
+    assert.equal(unmountCalled, false);
+    assert.equal(fragment.childNodes.length, 2);
+    assert.equal(fragment.firstChild?.nodeName, 'A');
   });
 });
 
