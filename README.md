@@ -91,6 +91,10 @@ Children that are **functions** (`() => someSignal.get()`) are reactive text nod
 
 Renders `rootChild` into `container` and clears any previous content.
 
+If the container already holds a previously mounted tree, `mount()` first runs
+the same teardown path as `unmount()` for existing children (component
+`onUnmount` hooks + registered disposers), then mounts the new root.
+
 | Param | Type | Description |
 |---|---|---|
 | `container` | `string \| Element` | CSS selector string or a DOM element. |
@@ -224,7 +228,9 @@ If(
 
 ### `Show(condition, child)`
 
-Toggles an element's `display` style between `''` and `'none'`. The element **stays in the DOM** — no teardown, no lifecycle hooks.
+Toggles an element's `display` style between `''` and `'none'`. The element
+**stays in the DOM** while visibility changes — no teardown and no lifecycle
+hooks on show/hide toggles.
 
 Use `Show` to preserve component state or skip remounting cost. Use [`If`](#ifcondition-thenchild-elsechild) for full teardown semantics.
 
@@ -251,6 +257,7 @@ Efficiently renders a keyed list. Each item gets its own reactive signal. When t
 - **Existing key** → `itemSignal.set(newItem)` — in-place reactive update, no remount.
 - **New key** → fresh signal + fresh DOM via `renderFn`.
 - **Removed key** → full teardown + DOM removal.
+- **Duplicate key in same list update** → logs an error and ignores later duplicates for that update cycle.
 
 | Param | Type | Description |
 |---|---|---|
@@ -367,6 +374,8 @@ Contexts let ancestor components provide values to any descendant without prop-d
 ### `createContext(defaultValue)`
 
 Creates a context object. Pass `defaultValue` to use when no ancestor has called `setContext`.
+Each `createContext(...)` call returns a unique token, so context values stay
+isolated even when multiple contexts are active in the same subtree.
 
 ```js
 const ThemeContext = createContext('light');
@@ -377,6 +386,7 @@ const ThemeContext = createContext('light');
 ### `setContext(ctx, value)`
 
 Sets a context value inside the **currently-constructing** component. All descendants will inherit this value.
+Calling it outside component construction is a no-op.
 
 ```js
 function ThemeProvider() {

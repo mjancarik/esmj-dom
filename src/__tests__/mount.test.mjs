@@ -77,6 +77,43 @@ describe('mount', () => {
       /mount: container not found/,
     );
   });
+
+  it('cleans up previous mounted tree before remounting', async () => {
+    const container = document.createElement('div');
+    let firstUnmountCalled = false;
+    let firstDisposed = false;
+
+    const first = createComponentInstance(
+      () => {
+        onUnmount(() => {
+          firstUnmountCalled = true;
+        });
+        onEffect(() => {
+          firstDisposed = true;
+        });
+        return document.createElement('div');
+      },
+      {},
+      null,
+    );
+
+    const second = createComponentInstance(
+      () => document.createElement('section'),
+      {},
+      null,
+    );
+
+    mount(container, first);
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    mount(container, second);
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    assert.equal(firstUnmountCalled, true);
+    assert.equal(firstDisposed, true);
+    assert.equal(container.firstChild?.tagName, 'SECTION');
+    assert.equal(container.childNodes.length, 1);
+  });
 });
 
 // ---------------------------------------------------------------------------

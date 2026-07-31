@@ -226,6 +226,12 @@ describe('Context API', () => {
     assert.equal(ctx.defaultValue, 'default');
   });
 
+  it('createContext creates unique ids per context token', () => {
+    const first = createContext('first-default');
+    const second = createContext('second-default');
+    assert.notEqual(first.id, second.id);
+  });
+
   it('getContext returns defaultValue when not inside a component', () => {
     const ctx = createContext('fallback');
     assert.equal(getContext(ctx), 'fallback');
@@ -241,6 +247,20 @@ describe('Context API', () => {
 
     setInternalContext(null);
     assert.equal(val, 'custom-value');
+  });
+
+  it('keeps distinct context values isolated in the same scope', () => {
+    const alpha = createContext('alpha-default');
+    const beta = createContext('beta-default');
+    const internal = { disposers: [], id: 'test-id', contexts: new Map() };
+    setInternalContext(internal);
+
+    setContext(alpha, 'alpha-value');
+    setContext(beta, 'beta-value');
+
+    assert.equal(getContext(alpha), 'alpha-value');
+    assert.equal(getContext(beta), 'beta-value');
+    setInternalContext(null);
   });
 });
 
