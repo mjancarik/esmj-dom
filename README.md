@@ -80,6 +80,7 @@ Children that are **functions** (`() => someSignal.get()`) are reactive text nod
 - `$ref: (el) => ...` — called with the real DOM element after it is created.
 - `on*` (e.g. `onClick`, `onInput`) — added as `addEventListener` listeners.
 - `style` — accepts an object `{ color: 'red' }` or a string.
+- `$dangerouslySetInnerHTML` — accepts a string, `DocumentFragment`, signal, or function and replaces element content reactively.
 
 **Ownership model** — `If` and `Each` accept two kinds of children:
 - **Borrowed Node** (`createElement('div', ...)`) — only detached/re-attached on branch switch; reactive bindings and effects stay alive across toggles.
@@ -145,6 +146,16 @@ createElement({ className: 'wrapper' }, [children]);
 - A component instance (result of `createElement(Component, props)`)
 - A `string` or `number` — becomes a text node
 - A `() => value` **function** — becomes a reactive text node; re-evaluated on signal change
+
+`$dangerouslySetInnerHTML` also supports reactive updates:
+
+```js
+const html = createSignal('<em>initial</em>');
+
+createElement('div', {
+  $dangerouslySetInnerHTML: html, // also accepts () => '<b>...</b>' or DocumentFragment
+});
+```
 
 ```js
 const count = createSignal(0);
