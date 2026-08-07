@@ -13,6 +13,15 @@ import { cleanupTree } from './lifecycle.mjs';
 /**
  * Render `rootChild` into `container`.
  *
+ * On every call the container is fully torn down first:
+ * - Signal effects stored directly on the container (e.g. from reactive
+ *   children created via `createReactiveNode`) are disposed.
+ * - All descendant component trees have their `onUnmount` hooks and signal
+ *   effect disposers run via `cleanupTree`.
+ *
+ * This makes `mount` safe to call multiple times on the same container
+ * (e.g. on client-side route changes) without leaking zombie effects.
+ *
  * @param {string | Element} container  CSS selector or DOM element.
  * @param {*} rootChild                 Component instance, Node, or string.
  */
@@ -27,14 +36,12 @@ export function mount(container, rootChild) {
   const isFragment = container instanceof DocumentFragment;
 
   if (!isFragment) {
-    if (container.childNodes.length > 0) {
-      let child = container.firstChild;
-      while (child) {
-        const next = child.nextSibling;
-        cleanupTree(child);
-        child = next;
-      }
-    }
+    // cleanupTree disposes signal effects stored on the container itself
+    // (e.g. from createReactiveNode) as well as all descendant component
+    // trees. This is more thorough than iterating only direct children,
+    // which missed container-level disposers and caused zombie effects on
+    // remount.
+    cleanupTree(container);
     container.innerHTML = '';
   }
 

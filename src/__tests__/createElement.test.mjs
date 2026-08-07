@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, computed, createSignal } from '@esmj/signals';
+import { createComponentInstance } from '../componentInstance.mjs';
 import { createElement, isSignalLike, renderChild } from '../createElement.mjs';
 import { useRef } from '../runtime.mjs';
 
@@ -496,5 +497,37 @@ describe('renderChild', () => {
     assert.ok(!parent.contains(span));
     // only the comment anchor remains
     assert.equal(parent.childElementCount, 0);
+  });
+
+  it('renders a ComponentInstance returned from a reactive function', async () => {
+    // Before this fix, a signal returning a ComponentInstance descriptor fell
+    // through to the String(value) fallback and rendered "[object Object]".
+    const sig = createSignal(false);
+    const parent = document.createElement('div');
+
+    renderChild(parent, () => {
+      if (!sig.get()) return null;
+      return createComponentInstance(
+        () => {
+          const el = document.createElement('b');
+          el.textContent = 'component';
+          return el;
+        },
+        {},
+        null,
+      );
+    });
+
+    assert.equal(parent.textContent, '', 'nothing rendered when false');
+    assert.ok(
+      !parent.textContent.includes('[object Object]'),
+      'must not render object toString',
+    );
+
+    sig.set(true);
+    await afterFlush();
+
+    assert.ok(parent.querySelector('b'), 'component element should be in DOM');
+    assert.equal(parent.querySelector('b')?.textContent, 'component');
   });
 });

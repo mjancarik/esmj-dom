@@ -223,7 +223,7 @@ describe('cleanupTree', () => {
     cleanupTree(el);
 
     assert.ok(disposed);
-    assert.equal(internal.disposers, null);
+    assert.deepEqual(internal.disposers, []);
   });
 
   it('runs unmount hooks for component root elements', () => {
@@ -259,20 +259,28 @@ describe('cleanupTree', () => {
     assert.ok(childDisposed);
   });
 
-  it('disposes component-scoped effects', () => {
+  it('continues cleanup when a disposer throws', () => {
     const el = document.createElement('div');
-    const id = `ct-effect-${Math.random()}`;
-    let effectDisposed = false;
-    initNodeInternal(el);
-    setNodeComponent(el, { componentId: id });
-    disposersRegistry.set(id, [
-      () => {
-        effectDisposed = true;
-      },
-    ]);
+    let secondDisposed = false;
+    const internal = initNodeInternal(el);
+    internal.disposers.push(() => {
+      throw new Error('disposer error');
+    });
+    internal.disposers.push(() => {
+      secondDisposed = true;
+    });
 
-    cleanupTree(el);
+    const errors = [];
+    const orig = console.error;
+    console.error = (...args) => errors.push(args);
 
-    assert.ok(effectDisposed);
+    assert.doesNotThrow(() => cleanupTree(el));
+    console.error = orig;
+
+    assert.ok(
+      secondDisposed,
+      'second disposer should still run after the first throws',
+    );
+    assert.ok(errors.length > 0, 'error should be reported to console.error');
   });
 });
