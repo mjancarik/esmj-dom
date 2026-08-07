@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { afterFlush, createSignal } from '@esmj/signals';
 
 import { createComponentInstance } from '../componentInstance.mjs';
+import { createElement } from '../createElement.mjs';
 import { onEffect, onUnmount } from '../lifecycle.mjs';
 import { mount, unmount } from '../mount.mjs';
 
@@ -151,6 +153,62 @@ describe('mount', () => {
     assert.equal(unmountCalled, false);
     assert.equal(fragment.childNodes.length, 2);
     assert.equal(fragment.firstChild?.nodeName, 'A');
+  });
+
+  it('disposes reactive effects attached to the container itself on remount', async () => {
+    // createReactiveNode stores its effect disposer on the container via
+    // addDisposer(container, dispose). The old mount() loop only cleaned direct
+    // child nodes and missed this, leaving zombie effects after remount.
+
+    const container = document.createElement('div');
+    const sig = createSignal('first');
+    let effectRunCount = 0;
+
+    const trackingSignal = {
+      get() {
+        effectRunCount++;
+        return sig.get();
+      },
+    };
+
+    mount(container, createElement('span', {}, trackingSignal));
+    await afterFlush();
+
+    const countAfterFirstMount = effectRunCount;
+
+    // Remount — old code left the first effect alive, so both effects would run
+    mount(container, createElement('em', {}));
+    await afterFlush();
+
+    sig.set('second');
+    await afterFlush();
+
+    // Only the new mount's effect should be active (or none, since the new
+    // element has no reactive children). The old effect must be gone.
+    assert.equal(
+      effectRunCount,
+      countAfterFirstMount,
+      'zombie effect from first mount must not fire after remount',
+    );
+  });
+
+  it('does not crash when mounting into a container previously cleaned by unmount', async () => {
+    // cleanupTree (called by unmount) resets internal.disposers to [].
+    // A subsequent mount that creates a reactive child calls addDisposer on the
+    // container — this must work without error.
+
+    const container = document.createElement('div');
+    const sig = createSignal('hello');
+
+    mount(container, createElement('span', {}, sig));
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    unmount(container);
+
+    // Must not throw
+    assert.doesNotThrow(() => {
+      mount(container, createElement('em', {}, sig));
+    });
   });
 });
 

@@ -13,7 +13,7 @@ import {
   isComponentInstance,
   mountComponentInstance,
 } from './componentInstance.mjs';
-import { cleanupTree } from './lifecycle.mjs';
+import { cleanupTree, runMountHooks } from './lifecycle.mjs';
 import { addDisposer, getInternalContext, withContext } from './runtime.mjs';
 
 // ---------------------------------------------------------------------------
@@ -286,9 +286,16 @@ export function renderChild(parent, child) {
 //
 // A comment node acts as a stable anchor. On each signal/function emission:
 //   - If the new value is a DOM Node it is inserted after the anchor.
+//   - If the new value is a ComponentInstance descriptor (returned by
+//     `createElement(MyComponent, props)`) it is constructed and mounted.
 //   - Otherwise a Text node is created for the stringified value.
 //   - The previous content node is cleaned up and removed before inserting
 //     the next one, so only one live node ever sits after the anchor.
+//
+// Security note: DOM Node values are inserted as-is, including any event
+// listeners already attached to the node. Never pass a reactive slot that
+// can accept attacker-controlled Node objects — only use developer-created
+// elements as signal values.
 // ---------------------------------------------------------------------------
 
 function createReactiveNode(parent, fn) {
@@ -302,8 +309,18 @@ function createReactiveNode(parent, fn) {
       const value = fn();
 
       let newNode;
+      let newInstance = null;
+
       if (value instanceof Node) {
         newNode = value;
+      } else if (isComponentInstance(value)) {
+        // A reactive slot may return a component descriptor (the result of
+        // createElement(MyComponent, props)). Construct it here so it
+        // participates in the normal lifecycle instead of rendering as
+        // "[object Object]".
+        newNode = value.$constructor();
+        newInstance = value;
+        if (!(newNode instanceof Node)) newNode = null;
       } else if (value == null || value === false || value === true) {
         newNode = null;
       } else {
@@ -317,6 +334,9 @@ function createReactiveNode(parent, fn) {
 
       if (newNode) {
         anchor.after(newNode);
+        if (newInstance) {
+          queueMicrotask(() => runMountHooks(newInstance));
+        }
       }
 
       currentNode = newNode ?? null;
