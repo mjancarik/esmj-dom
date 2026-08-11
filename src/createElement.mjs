@@ -38,6 +38,16 @@ const DOM_PROPERTIES = new Set([
   'indeterminate',
 ]);
 
+const BLOCKED_ATTRIBUTE_NAMES = new Set(['srcdoc']);
+const URL_LIKE_ATTRIBUTES = new Set([
+  'href',
+  'src',
+  'action',
+  'formaction',
+  'xlink:href',
+]);
+const BLOCKED_EVENT_NAMES = new Set(['securitypolicyviolation']);
+
 // ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
@@ -111,6 +121,44 @@ function applyInnerContent(element, value) {
   }
 }
 
+function isUnsafeUrlValue(value) {
+  if (typeof value !== 'string') return false;
+  const normalized = value
+    // Strip Unicode whitespace plus control characters used in obfuscated schemes.
+    .replace(/[\p{White_Space}\p{Cc}]+/gu, '')
+    .toLowerCase();
+  return normalized.startsWith('javascript:');
+}
+
+function isBlockedAttribute(key, value) {
+  if (typeof key !== 'string') return false;
+  const normalizedKey = key.toLowerCase();
+  if (BLOCKED_ATTRIBUTE_NAMES.has(normalizedKey)) return true;
+  return (
+    URL_LIKE_ATTRIBUTES.has(normalizedKey) &&
+    value !== null &&
+    value !== undefined &&
+    isUnsafeUrlValue(String(value))
+  );
+}
+
+function setSafeAttribute(element, key, value) {
+  if (value === null || value === undefined || value === false) {
+    element.removeAttribute(key);
+    return;
+  }
+
+  if (isBlockedAttribute(key, value)) {
+    element.removeAttribute(key);
+    console.warn(
+      `[esmj-dom] Blocked unsafe attribute "${String(key)}" on <${element.tagName.toLowerCase()}>`,
+    );
+    return;
+  }
+
+  element.setAttribute(key, value);
+}
+
 function applyProps(element, props) {
   const capturedContext = getInternalContext();
 
@@ -177,6 +225,12 @@ function applyProps(element, props) {
       typeof value === 'function'
     ) {
       const eventName = key.slice(2).toLowerCase();
+      if (BLOCKED_EVENT_NAMES.has(eventName)) {
+        console.warn(
+          `[esmj-dom] Blocked unsafe event binding "${key}" on <${element.tagName.toLowerCase()}>`,
+        );
+        continue;
+      }
       element.addEventListener(eventName, value);
       continue;
     }
@@ -190,10 +244,8 @@ function applyProps(element, props) {
           if (DOM_PROPERTIES.has(attrKey)) {
             // Set as DOM property so live form values (value, checked, …) update
             element[attrKey] = v ?? '';
-          } else if (v === null || v === undefined || v === false) {
-            element.removeAttribute(attrKey);
           } else {
-            element.setAttribute(attrKey, v);
+            setSafeAttribute(element, attrKey, v);
           }
         });
       });
@@ -205,10 +257,8 @@ function applyProps(element, props) {
     // Static attribute
     if (DOM_PROPERTIES.has(key) || typeof key === 'symbol') {
       element[key] = value ?? '';
-    } else if (value === null || value === undefined) {
-      element.removeAttribute(key);
     } else {
-      element.setAttribute(key, value);
+      setSafeAttribute(element, key, value);
     }
   }
 }
