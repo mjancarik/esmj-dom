@@ -78,9 +78,10 @@ Children that are **functions** (`() => someSignal.get()`) are reactive text nod
 
 **Special props:**
 - `$ref: (el) => ...` — called with the real DOM element after it is created.
-- `on*` (e.g. `onClick`, `onInput`) — added as `addEventListener` listeners.
+- `on*` (e.g. `onClick`, `onInput`) — added as `addEventListener` listeners (`onSecurityPolicyViolation` is blocked).
 - `style` — accepts an object `{ color: 'red' }` or a string.
 - `$dangerouslySetInnerHTML` — accepts a string, `DocumentFragment`, signal, or function and replaces element content reactively.
+- Security guardrails: `srcdoc` is blocked, and URL-like attributes (`href`, `src`, `action`, `formaction`, `xlink:href`) reject `javascript:` values.
 
 **Ownership model** — `If` and `Each` accept two kinds of children:
 - **Borrowed Node** (`createElement('div', ...)`) — only detached/re-attached on branch switch; reactive bindings and effects stay alive across toggles.

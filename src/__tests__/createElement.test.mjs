@@ -67,6 +67,21 @@ describe('createElement — static', () => {
     assert.equal(el.getAttribute('data-foo'), 'bar');
   });
 
+  it('blocks unsafe srcdoc attribute', () => {
+    const el = createElement('iframe', { srcdoc: '<script>alert(1)</script>' });
+    assert.equal(el.hasAttribute('srcdoc'), false);
+  });
+
+  it('blocks javascript: URLs in href', () => {
+    const el = createElement('a', { href: "javascript:alert('xss')" });
+    assert.equal(el.hasAttribute('href'), false);
+  });
+
+  it('allows safe href values', () => {
+    const el = createElement('a', { href: '/docs' });
+    assert.equal(el.getAttribute('href'), '/docs');
+  });
+
   it('aliases className → class', () => {
     const el = createElement('div', { className: 'foo' });
     assert.equal(el.getAttribute('class'), 'foo');
@@ -228,6 +243,17 @@ describe('createElement — events', () => {
     el.dispatchEvent(new Event('input'));
     assert.ok(fired);
   });
+
+  it('blocks onSecurityPolicyViolation listener binding', () => {
+    let fired = false;
+    const el = createElement('div', {
+      onSecurityPolicyViolation: () => {
+        fired = true;
+      },
+    });
+    el.dispatchEvent(new Event('securitypolicyviolation'));
+    assert.equal(fired, false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -256,6 +282,17 @@ describe('createElement — reactive attributes', () => {
     await afterFlush();
 
     assert.equal(el.getAttribute('data-val'), 'b');
+  });
+
+  it('blocks javascript: URLs from reactive attribute values', async () => {
+    const href = createSignal('/safe');
+    const el = createElement('a', { href });
+    assert.equal(el.getAttribute('href'), '/safe');
+
+    href.set(' javascript:alert(1)');
+    await afterFlush();
+
+    assert.equal(el.hasAttribute('href'), false);
   });
 
   it('removes attribute when reactive value is false', async () => {
