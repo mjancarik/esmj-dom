@@ -96,6 +96,31 @@ describe('createComponentInstance — function component', () => {
     assert.equal(receivedProps.count.get(), 5);
   });
 
+  it('keeps __proto__ as data prop without polluting Object.prototype', () => {
+    const before = {}.isAdmin;
+    let receivedProps = null;
+    const fn = (props) => {
+      receivedProps = props;
+      return document.createElement('div');
+    };
+
+    const attackerProps = JSON.parse(
+      '{"__proto__":{"isAdmin":true},"safe":"ok"}',
+    );
+    const instance = createComponentInstance(fn, attackerProps, null);
+    instance.$constructor();
+
+    const protoDescriptor = Object.getOwnPropertyDescriptor(
+      receivedProps,
+      '__proto__',
+    );
+    assert.ok(protoDescriptor);
+    assert.ok(typeof protoDescriptor.value.get === 'function');
+    assert.equal(protoDescriptor.value.get().isAdmin, true);
+    assert.equal(receivedProps.safe.get(), 'ok');
+    assert.equal({}.isAdmin, before);
+  });
+
   it('passes children through to the function', () => {
     let receivedChildren = null;
     const fn = (props) => {
