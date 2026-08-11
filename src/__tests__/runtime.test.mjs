@@ -72,6 +72,22 @@ describe('normalizeProps', () => {
     const result = normalizeProps({ signal: keepLiteral(sig) });
     assert.equal(result.signal, sig);
   });
+
+  it('does not mutate Object prototype when __proto__ exists in props', () => {
+    const before = {}.isAdmin;
+    const props = JSON.parse('{"__proto__":{"isAdmin":true},"safe":1}');
+    const result = normalizeProps(props);
+    const protoDescriptor = Object.getOwnPropertyDescriptor(
+      result,
+      '__proto__',
+    );
+
+    assert.equal({}.isAdmin, before);
+    assert.ok(protoDescriptor);
+    assert.ok(typeof protoDescriptor.value.get === 'function');
+    assert.equal(protoDescriptor.value.get().isAdmin, true);
+    assert.equal(result.safe.get(), 1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -213,6 +229,12 @@ describe('deepEqual', () => {
   it('returns true for identical reference', () => {
     const obj = { x: 1 };
     assert.ok(deepEqual(obj, obj));
+  });
+
+  it('compares own __proto__ properties without traversing prototype chain', () => {
+    const first = JSON.parse('{"__proto__":{"nested":1},"value":2}');
+    const second = JSON.parse('{"__proto__":{"nested":1},"value":2}');
+    assert.ok(deepEqual(first, second));
   });
 });
 

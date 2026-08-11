@@ -239,7 +239,7 @@ export const disposersRegistry = new Map();
  *   values.
  */
 export function normalizeProps(props) {
-  const result = {};
+  const result = Object.create(null);
   for (const key of Object.keys(props)) {
     const value = props[key];
     if (key === 'children') {
@@ -278,7 +278,17 @@ export function deepEqual(a, b) {
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
-  return keysA.every((k) => deepEqual(a[k], b[k]));
+  return keysA.every((k) => {
+    const descriptorA = Object.getOwnPropertyDescriptor(a, k);
+    const descriptorB = Object.getOwnPropertyDescriptor(b, k);
+    if (!descriptorA || !descriptorB) return false;
+
+    const valueA =
+      'value' in descriptorA ? descriptorA.value : descriptorA.get?.call(a);
+    const valueB =
+      'value' in descriptorB ? descriptorB.value : descriptorB.get?.call(b);
+    return deepEqual(valueA, valueB);
+  });
 }
 
 // ---------------------------------------------------------------------------

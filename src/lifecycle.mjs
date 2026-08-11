@@ -124,20 +124,32 @@ export function disposeComponent(componentId) {
 
 /**
  * Recursively tear down a DOM subtree:
- * 1. Dispose any signal effects attached to the node via _disposers.
- * 2. If the node is a component root (has COMPONENT_INSTANCE), run unmount
- *    hooks and dispose component-scoped effects.
+ * 1. Dispose any signal effects attached to the node via `addDisposer`.
+ *    Each disposer is wrapped in a try/catch so that one misbehaving
+ *    disposer (e.g. from a third-party plugin) cannot silently prevent all
+ *    subsequent cleanups from running.
+ * 2. If the node is a component root (has `NODE_COMPONENT`), run its
+ *    `onUnmount` hooks and dispose component-scoped signal effects.
  * 3. Recurse into child nodes.
  */
 export function cleanupTree(node) {
   if (!node) return;
 
   const internal = initNodeInternal(node);
-  if (internal?.disposers) {
+  if (internal?.disposers?.length) {
     for (const dispose of internal.disposers) {
-      dispose();
+      // Guard against a single misbehaving disposer silently skipping all
+      // subsequent cleanups (e.g. a third-party plugin that throws).
+      try {
+        dispose();
+      } catch (err) {
+        console.error(
+          '[esmj-dom] cleanupTree: disposer threw, cleanup continues',
+          err,
+        );
+      }
     }
-    internal.disposers = null;
+    internal.disposers = [];
   }
 
   const instance = getNodeComponent(node);
