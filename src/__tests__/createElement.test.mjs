@@ -77,6 +77,11 @@ describe('createElement — static', () => {
     assert.equal(el.hasAttribute('href'), false);
   });
 
+  it('blocks javascript: URLs prefixed by unicode whitespace', () => {
+    const el = createElement('a', { href: '\u00A0javascript:alert(1)' });
+    assert.equal(el.hasAttribute('href'), false);
+  });
+
   it('allows safe href values', () => {
     const el = createElement('a', { href: '/docs' });
     assert.equal(el.getAttribute('href'), '/docs');
@@ -290,6 +295,17 @@ describe('createElement — reactive attributes', () => {
     assert.equal(el.getAttribute('href'), '/safe');
 
     href.set(' javascript:alert(1)');
+    await afterFlush();
+
+    assert.equal(el.hasAttribute('href'), false);
+  });
+
+  it('blocks unicode-whitespace-prefixed javascript URLs from reactive values', async () => {
+    const href = createSignal('/safe');
+    const el = createElement('a', { href });
+    assert.equal(el.getAttribute('href'), '/safe');
+
+    href.set('\u2003javascript:alert(1)');
     await afterFlush();
 
     assert.equal(el.hasAttribute('href'), false);

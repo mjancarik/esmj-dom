@@ -123,12 +123,9 @@ function applyInnerContent(element, value) {
 
 function isUnsafeUrlValue(value) {
   if (typeof value !== 'string') return false;
-  const normalized = Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0);
-      return !(code <= 32 || code === 127);
-    })
-    .join('')
+  const normalized = value
+    // Strip Unicode whitespace plus control characters used in obfuscated schemes.
+    .replace(/[\p{White_Space}\p{Cc}]+/gu, '')
     .toLowerCase();
   return normalized.startsWith('javascript:');
 }
