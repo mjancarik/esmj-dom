@@ -123,12 +123,8 @@ function applyInnerContent(element, value) {
 
 function isUnsafeUrlValue(value) {
   if (typeof value !== 'string') return false;
-  const normalized = Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0);
-      return !(code <= 32 || code === 127);
-    })
-    .join('')
+  const normalized = value
+    .replace(/[\s\u0000-\u001f\u007f]+/g, '')
     .toLowerCase();
   return normalized.startsWith('javascript:');
 }
