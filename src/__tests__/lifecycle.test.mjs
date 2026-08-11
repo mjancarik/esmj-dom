@@ -273,9 +273,11 @@ describe('cleanupTree', () => {
     const errors = [];
     const orig = console.error;
     console.error = (...args) => errors.push(args);
-
-    assert.doesNotThrow(() => cleanupTree(el));
-    console.error = orig;
+    try {
+      assert.doesNotThrow(() => cleanupTree(el));
+    } finally {
+      console.error = orig;
+    }
 
     assert.ok(
       secondDisposed,
