@@ -22,9 +22,6 @@ import { addDisposer, getInternalContext, withContext } from './runtime.mjs';
 const PROP_ALIASES = {
   className: 'class',
   htmlFor: 'for',
-  tabIndex: 'tabindex',
-  readOnly: 'readonly',
-  autoComplete: 'autocomplete',
 };
 
 // Props that must be set as DOM properties, not HTML attributes.
@@ -47,6 +44,14 @@ const URL_LIKE_ATTRIBUTES = new Set([
   'xlink:href',
 ]);
 const BLOCKED_EVENT_NAMES = new Set(['securitypolicyviolation']);
+
+// Attributes where explicit false/true must be preserved as text tokens
+// rather than removed as generic falsy values.
+const ENUMERATED_BOOLEAN_ATTRIBUTES = new Set([
+  'contenteditable',
+  'draggable',
+  'spellcheck',
+]);
 
 // ---------------------------------------------------------------------------
 // Utility
@@ -142,13 +147,51 @@ function isBlockedAttribute(key, value) {
   );
 }
 
-function setSafeAttribute(element, key, value) {
+function normalizeAttributeKey(key) {
+  if (typeof key !== 'string') return key;
+
+  if (PROP_ALIASES[key]) {
+    return PROP_ALIASES[key];
+  }
+
+  // Keep special/internal keys and known DOM properties unchanged.
+  if (key.startsWith('$') || key.startsWith('on') || DOM_PROPERTIES.has(key)) {
+    return key;
+  }
+
+  return key.toLowerCase();
+}
+
+function normalizeAttributeValue(key, value) {
+  const normalizedKey = normalizeAttributeKey(key);
+  const normalizedKeyName =
+    typeof normalizedKey === 'string'
+      ? normalizedKey.toLowerCase()
+      : String(normalizedKey).toLowerCase();
+
+  if (
+    ENUMERATED_BOOLEAN_ATTRIBUTES.has(normalizedKeyName) &&
+    (value === true || value === false || value === 'true' || value === 'false')
+  ) {
+    return String(value);
+  }
+
   if (value === null || value === undefined || value === false) {
+    return null;
+  }
+
+  return value;
+}
+
+function setSafeAttribute(element, key, value) {
+  const normalizedValue = normalizeAttributeValue(key, value);
+
+  if (normalizedValue === null) {
     element.removeAttribute(key);
     return;
   }
 
-  if (isBlockedAttribute(key, value)) {
+  if (isBlockedAttribute(key, normalizedValue)) {
     element.removeAttribute(key);
     console.warn(
       `[esmj-dom] Blocked unsafe attribute "${String(key)}" on <${element.tagName.toLowerCase()}>`,
@@ -156,7 +199,7 @@ function setSafeAttribute(element, key, value) {
     return;
   }
 
-  element.setAttribute(key, value);
+  element.setAttribute(key, normalizedValue);
 }
 
 function applyProps(element, props) {
@@ -165,8 +208,8 @@ function applyProps(element, props) {
   for (let [key, value] of Reflect.ownKeys(props).map((k) => [k, props[k]])) {
     if (key === 'id') continue; // already handled above
 
-    // Prop name aliases (className → class, htmlFor → for, …)
-    key = PROP_ALIASES[key] ?? key;
+    // Prop key normalization (aliases + lowercase attribute names)
+    key = normalizeAttributeKey(key);
 
     // $ref — callback ref or object ref
     if (key === '$ref') {

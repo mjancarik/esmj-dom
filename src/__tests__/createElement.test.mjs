@@ -147,6 +147,31 @@ describe('createElement — static', () => {
     const el = createElement('input', { defaultValue: 'hello' });
     assert.equal(el.defaultValue, 'hello');
   });
+
+  it('serializes contentEditable=false as contenteditable="false"', () => {
+    const parent = document.createElement('div');
+    parent.contentEditable = 'true';
+
+    const el = createElement('div', { contentEditable: false });
+    parent.appendChild(el);
+
+    assert.equal(el.getAttribute('contenteditable'), 'false');
+  });
+
+  it('serializes contentEditable=true as contenteditable="true"', () => {
+    const el = createElement('div', { contentEditable: true });
+    assert.equal(el.getAttribute('contenteditable'), 'true');
+  });
+
+  it('serializes draggable=false as draggable="false"', () => {
+    const el = createElement('div', { draggable: false });
+    assert.equal(el.getAttribute('draggable'), 'false');
+  });
+
+  it('serializes spellCheck=false as spellcheck="false"', () => {
+    const el = createElement('div', { spellCheck: false });
+    assert.equal(el.getAttribute('spellcheck'), 'false');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -330,6 +355,46 @@ describe('createElement — reactive attributes', () => {
     await afterFlush();
 
     assert.equal(el.value, 'world');
+  });
+
+  it('tracks signal-bound contentEditable attribute', async () => {
+    const parent = document.createElement('div');
+    parent.contentEditable = 'true';
+
+    const sig = createSignal(true);
+    const el = createElement('div', { contentEditable: sig });
+    parent.appendChild(el);
+
+    assert.equal(el.getAttribute('contenteditable'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('contenteditable'), 'false');
+  });
+
+  it('tracks signal-bound draggable attribute', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', { draggable: sig });
+
+    assert.equal(el.getAttribute('draggable'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('draggable'), 'false');
+  });
+
+  it('tracks signal-bound spellcheck attribute', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', { spellCheck: sig });
+
+    assert.equal(el.getAttribute('spellcheck'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('spellcheck'), 'false');
   });
 });
 
