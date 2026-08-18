@@ -172,6 +172,16 @@ describe('createElement — static', () => {
     const el = createElement('div', { spellCheck: false });
     assert.equal(el.getAttribute('spellcheck'), 'false');
   });
+
+  it('preserves SVG viewBox casing', () => {
+    const el = createElement('svg', { viewBox: '0 0 24 24' });
+    assert.equal(el.getAttribute('viewBox'), '0 0 24 24');
+  });
+
+  it('preserves SVG preserveAspectRatio casing', () => {
+    const el = createElement('svg', { preserveAspectRatio: 'xMidYMid meet' });
+    assert.equal(el.getAttribute('preserveAspectRatio'), 'xMidYMid meet');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -395,6 +405,113 @@ describe('createElement — reactive attributes', () => {
     await afterFlush();
 
     assert.equal(el.getAttribute('spellcheck'), 'false');
+  });
+
+  it('tracks function-bound contentEditable attribute', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', {
+      contentEditable: () => sig.get(),
+    });
+
+    assert.equal(el.getAttribute('contenteditable'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('contenteditable'), 'false');
+  });
+
+  it('tracks function-bound draggable attribute', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', {
+      draggable: () => sig.get(),
+    });
+
+    assert.equal(el.getAttribute('draggable'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('draggable'), 'false');
+  });
+
+  it('tracks function-bound spellcheck attribute', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', {
+      spellCheck: () => sig.get(),
+    });
+
+    assert.equal(el.getAttribute('spellcheck'), 'true');
+
+    sig.set(false);
+    await afterFlush();
+
+    assert.equal(el.getAttribute('spellcheck'), 'false');
+  });
+
+  it('removes contenteditable when signal value becomes null', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', { contentEditable: sig });
+
+    assert.equal(el.getAttribute('contenteditable'), 'true');
+
+    sig.set(null);
+    await afterFlush();
+
+    assert.equal(el.hasAttribute('contenteditable'), false);
+  });
+
+  it('removes draggable when signal value becomes undefined', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', { draggable: sig });
+
+    assert.equal(el.getAttribute('draggable'), 'true');
+
+    sig.set(undefined);
+    await afterFlush();
+
+    assert.equal(el.hasAttribute('draggable'), false);
+  });
+
+  it('removes spellcheck when function-bound value becomes null', async () => {
+    const sig = createSignal(true);
+    const el = createElement('div', {
+      spellCheck: () => {
+        const v = sig.get();
+        return v === null ? null : v;
+      },
+    });
+
+    assert.equal(el.getAttribute('spellcheck'), 'true');
+
+    sig.set(null);
+    await afterFlush();
+
+    assert.equal(el.hasAttribute('spellcheck'), false);
+  });
+
+  it('tracks signal-bound SVG viewBox attribute with original casing', async () => {
+    const sig = createSignal('0 0 16 16');
+    const el = createElement('svg', { viewBox: sig });
+
+    assert.equal(el.getAttribute('viewBox'), '0 0 16 16');
+
+    sig.set('0 0 24 24');
+    await afterFlush();
+
+    assert.equal(el.getAttribute('viewBox'), '0 0 24 24');
+  });
+
+  it('tracks signal-bound SVG preserveAspectRatio attribute with original casing', async () => {
+    const sig = createSignal('xMidYMid meet');
+    const el = createElement('svg', { preserveAspectRatio: sig });
+
+    assert.equal(el.getAttribute('preserveAspectRatio'), 'xMidYMid meet');
+
+    sig.set('none');
+    await afterFlush();
+
+    assert.equal(el.getAttribute('preserveAspectRatio'), 'none');
   });
 });
 

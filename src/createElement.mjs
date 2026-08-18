@@ -154,12 +154,7 @@ function normalizeAttributeKey(key) {
     return PROP_ALIASES[key];
   }
 
-  // Keep special/internal keys and known DOM properties unchanged.
-  if (key.startsWith('$') || key.startsWith('on') || DOM_PROPERTIES.has(key)) {
-    return key;
-  }
-
-  return key.toLowerCase();
+  return key;
 }
 
 function normalizeAttributeValue(key, value) {
