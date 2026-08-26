@@ -383,6 +383,14 @@ describe('getNodeComponent / setNodeComponent', () => {
     setNodeComponent(el, fakeInstance);
     assert.equal(getNodeComponent(el), fakeInstance);
   });
+
+  it('returns null for a null element', () => {
+    assert.equal(getNodeComponent(null), null);
+  });
+
+  it('returns null for an undefined element', () => {
+    assert.equal(getNodeComponent(undefined), null);
+  });
 });
 
 // ---------------------------------------------------------------------------

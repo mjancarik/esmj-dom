@@ -141,7 +141,7 @@ export function setInternalContext(ctx) {
  * @returns {*}  The component instance, or `null`.
  */
 export function getNodeComponent(element) {
-  return element[NODE_COMPONENT] || null;
+  return element?.[NODE_COMPONENT] || null;
 }
 
 export function setNodeComponent(element, instance) {
