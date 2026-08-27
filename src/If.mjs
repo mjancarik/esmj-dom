@@ -13,13 +13,24 @@
 //   - Component instance ($constructor result): OWNED — full cleanupTree on
 //     deactivation, fresh $constructor call on re-activation.
 //
-// Imports: component.mjs, lifecycle.mjs, @esmj/signals, easy-uid
+// A pre-built Fragment is treated as borrowed (its already-live children are
+// detached without cleanupTree, matching the borrowed-Node contract above).
+// Because inserting a Fragment empties it, a borrowed Fragment's children are
+// extracted into a stable node array ONCE, up front (not on every toggle),
+// and that same array is reused across all activations; a component instance
+// whose render result is a Fragment is owned (each of the fragment's
+// children is torn down via cleanupTree, matching the owned contract, and a
+// fresh Fragment is produced by $constructor() on every re-activation). See
+// resolveRenderedNodes/removeRenderedNodes in createElement.mjs.
+//
+// Imports: component.mjs, createElement.mjs, lifecycle.mjs, @esmj/signals, easy-uid
 // ---------------------------------------------------------------------------
 
 import { computed, effect, untrack } from '@esmj/signals';
 import uid from 'easy-uid';
 import { isComponentInstance } from './componentInstance.mjs';
-import { cleanupTree, runMountHooks } from './lifecycle.mjs';
+import { removeRenderedNodes, resolveRenderedNodes } from './createElement.mjs';
+import { runMountHooks } from './lifecycle.mjs';
 import { addDisposer } from './runtime.mjs';
 
 /**
@@ -27,9 +38,9 @@ import { addDisposer } from './runtime.mjs';
  * reactive condition, with full DOM lifecycle management.
  *
  * Ownership model:
- * - Pre-built `Node` (passed directly): **borrowed** — only detached on branch
- *   switch, never torn down. Reactive attributes and disposers are preserved
- *   across multiple toggles.
+ * - Pre-built `Node` or `Fragment` (passed directly): **borrowed** — only
+ *   detached on branch switch, never torn down. Reactive attributes and
+ *   disposers are preserved across multiple toggles.
  * - Component instance (descriptor returned by a component function): **owned**
  *   — fully torn down (`cleanupTree`) on deactivation and re-constructed on
  *   re-activation. `onMount`/`onUnmount` hooks fire accordingly.
@@ -49,9 +60,29 @@ export function If(condition, thenChild, elseChild) {
   container.style.display = 'contents';
   container.setAttribute('data-if', uid());
 
+  // Borrowed branches (anything that is not a component instance — a plain
+  // Node, a pre-built Fragment, or a primitive) are resolved to their live
+  // node(s) exactly ONCE, up front, and that same node array is reused on
+  // every activation. This matters for Fragments in particular: inserting a
+  // DocumentFragment anywhere empties it, so re-reading `resolveRenderedNodes`
+  // from the *original* Fragment reference on a later toggle would find it
+  // already empty. Component-instance branches are intentionally NOT
+  // resolved here — they get a fresh $constructor() call on every
+  // activation (owned/full-remount contract).
+  const thenOwned = isComponentInstance(thenChild);
+  const elseOwned = elseChild != null && isComponentInstance(elseChild);
+  const thenBorrowedNodes =
+    thenChild != null && !thenOwned
+      ? resolveRenderedNodes(thenChild).nodes
+      : null;
+  const elseBorrowedNodes =
+    elseChild != null && !elseOwned
+      ? resolveRenderedNodes(elseChild).nodes
+      : null;
+
   let currentBranch = null; // 'then' | 'else' | null
-  let currentElement = null; // the DOM node currently active in this container
-  let currentOwned = false; // true → we own it and must cleanupTree on switch
+  let currentNodes = []; // the DOM node(s) currently active in this container
+  let currentOwned = false; // true → we own them and must cleanupTree on switch
 
   const conditionComputed = computed(() => !!condition());
 
@@ -63,14 +94,9 @@ export function If(condition, thenChild, elseChild) {
     currentBranch = newBranch;
 
     // Deactivate the current branch
-    if (currentElement) {
-      if (currentOwned) {
-        // Component instance result: fully teardown (unmount hooks + disposers)
-        cleanupTree(currentElement);
-      }
-      // In both cases remove from DOM
-      currentElement.remove();
-      currentElement = null;
+    if (currentNodes.length) {
+      removeRenderedNodes(currentNodes, currentOwned);
+      currentNodes = [];
       currentOwned = false;
     }
 
@@ -78,23 +104,29 @@ export function If(condition, thenChild, elseChild) {
     const child = result ? thenChild : elseChild;
     if (child == null) return;
 
+    const owned = result ? thenOwned : elseOwned;
+
     // Wrap DOM construction in untrack so signals read during $constructor
     // do not accidentally become dependencies of this effect.
     untrack(() => {
-      if (isComponentInstance(child)) {
-        // Owned: create fresh DOM + run lifecycle
-        const el = child.$constructor();
-        if (el instanceof Node) {
-          container.appendChild(el);
-          currentElement = el;
-          currentOwned = true;
-        }
-        queueMicrotask(() => runMountHooks(child));
-      } else if (child instanceof Node) {
-        // Borrowed: just re-attach, keep _disposers intact
-        container.appendChild(child);
-        currentElement = child;
-        currentOwned = false;
+      let nodes;
+      let instance = null;
+
+      if (owned) {
+        ({ nodes, instance } = resolveRenderedNodes(child));
+      } else {
+        nodes = result ? thenBorrowedNodes : elseBorrowedNodes;
+      }
+
+      if (nodes.length) {
+        container.append(...nodes);
+      }
+
+      currentNodes = nodes;
+      currentOwned = owned;
+
+      if (instance) {
+        queueMicrotask(() => runMountHooks(instance));
       }
     });
   });

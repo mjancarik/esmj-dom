@@ -107,12 +107,33 @@ export function createComponentInstance(fn, props, children) {
       const element = resolveToElement(result);
       instance.element = element;
 
-      // Associate the templateInternal with the element node so that
-      // cleanupTree can find and dispose its signal effects.
-      initNodeInternal(element, templateInternal);
+      // Associate the templateInternal (disposers) and the instance
+      // (onMount/onUnmount bookkeeping) with the element node so that
+      // cleanupTree can find and dispose them.
+      //
+      // Bug fix: a DocumentFragment result (e.g. from `render() { return
+      // <Fragment>...</Fragment>; }`) gets emptied into its parent as soon
+      // as it is appended (mountComponentInstance / renderChild / If / Each
+      // all do this) — the bookkeeping must therefore be attached to each of
+      // its *top-level children* individually, not to the fragment object
+      // itself, otherwise cleanupTree's live-DOM-tree walk would never find
+      // it and onUnmount/effect disposal would silently never run.
+      //
+      // Known remaining limitation: an *empty* Fragment has no child node to
+      // carry this bookkeeping at all, so onUnmount/disposers registered by
+      // such a component still cannot run — there is no live DOM node left
+      // to hang them on.
+      if (element instanceof DocumentFragment && element.childNodes.length) {
+        for (const child of element.childNodes) {
+          initNodeInternal(child, templateInternal);
+          setNodeComponent(child, instance);
+        }
+      } else {
+        initNodeInternal(element, templateInternal);
 
-      if (element instanceof Node) {
-        setNodeComponent(element, instance);
+        if (element instanceof Node) {
+          setNodeComponent(element, instance);
+        }
       }
 
       return element;

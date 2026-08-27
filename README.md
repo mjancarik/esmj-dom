@@ -11,6 +11,7 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
   - [mount](#mountcontainer-rootchild)
   - [unmount](#unmountcontainer)
   - [createElement](#createelementtagnamecomponent-props-children)
+  - [Fragment & JSX support](#fragment--jsx-support)
   - [Component](#component-base-class)
   - [If](#ifcondition-thenchild-elsechild)
   - [Show](#showcondition-child)
@@ -169,6 +170,58 @@ createElement('p', {}, [
   () => `Current count: ${count.get()}`,
 ]);
 ```
+
+---
+
+### Fragment & JSX support
+
+`@esmj/dom` ships an automatic JSX runtime, so you can use `.jsx`/`.tsx` files with a transpiler (esbuild, Babel, or TypeScript) configured for the **automatic** JSX transform instead of calling `createElement` directly.
+
+**tsconfig.json:**
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@esmj/dom"
+  }
+}
+```
+
+Once configured, the transpiler rewrites JSX into calls against `@esmj/dom/jsx-runtime` (production) or `@esmj/dom/jsx-dev-runtime` (dev-time tooling such as Vite dev/Babel `development: true`) automatically — you don't import from those entry points yourself.
+
+```jsx
+import { createSignal } from '@esmj/signals';
+import { mount } from '@esmj/dom';
+
+function Counter() {
+  const count = createSignal(0);
+  return (
+    <button onClick={() => count.set(count.get() + 1)}>
+      Count: {() => count.get()}
+    </button>
+  );
+}
+
+mount('#app', <Counter />);
+```
+
+**`Fragment`** (`<>...</>`) groups children without introducing a wrapping DOM element — it renders as a `DocumentFragment`. It is also exported as a value from the main package for direct `createElement(Fragment, props, children)` calls.
+
+```jsx
+import { Fragment } from '@esmj/dom';
+
+function Pair() {
+  return (
+    <>
+      <span>left</span>
+      <span>right</span>
+    </>
+  );
+}
+```
+
+> **Known limitation:** returning a `Fragment` as the *sole* root value of a component's `render()`/function body works for mounting and unmounting (including `onMount`/`onUnmount`/`onEffect`), but an **empty** Fragment (zero children) has no live DOM node left to carry that bookkeeping, so its lifecycle hooks will not fire. Always render at least one child from a Fragment-returning component.
 
 ---
 

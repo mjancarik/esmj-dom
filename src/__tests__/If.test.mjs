@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { createComponentInstance } from '../componentInstance.mjs';
+import { createElement, Fragment } from '../createElement.mjs';
 import { If } from '../If.mjs';
 import { onUnmount } from '../lifecycle.mjs';
 
@@ -207,5 +208,80 @@ describe('If — owned component instance', () => {
     await afterFlush();
 
     assert.equal(callCount, 2, '$constructor called again on re-activation');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fragment children (regression test for the DocumentFragment-empties-itself
+// bug — see createElement.mjs's resolveRenderedNodes/removeRenderedNodes)
+// ---------------------------------------------------------------------------
+
+describe('If — Fragment children', () => {
+  it('renders a pre-built Fragment as thenChild and removes it cleanly on toggle', async () => {
+    const cond = createSignal(true);
+    const s1 = document.createElement('span');
+    s1.textContent = 'a';
+    const s2 = document.createElement('span');
+    s2.textContent = 'b';
+    const frag = createElement(Fragment, {}, [s1, s2]);
+
+    const container = If(() => cond.get(), frag);
+    await afterFlush();
+
+    assert.equal(container.querySelectorAll('span').length, 2);
+    assert.ok(container.contains(s1));
+    assert.ok(container.contains(s2));
+
+    cond.set(false);
+    await afterFlush();
+
+    assert.equal(container.querySelectorAll('span').length, 0);
+
+    cond.set(true);
+    await afterFlush();
+
+    assert.equal(container.querySelectorAll('span').length, 2);
+  });
+
+  it('handles a component instance whose render() returns a Fragment as thenChild, toggled multiple times', async () => {
+    let renderCount = 0;
+    let unmountCount = 0;
+
+    const thenInstance = createComponentInstance(
+      () => {
+        renderCount++;
+        onUnmount(() => {
+          unmountCount++;
+        });
+        const a = document.createElement('span');
+        const b = document.createElement('em');
+        return createElement(Fragment, {}, [a, b]);
+      },
+      {},
+      null,
+    );
+
+    const cond = createSignal(true);
+    const container = If(() => cond.get(), thenInstance);
+    await afterFlush();
+    await new Promise((r) => queueMicrotask(r));
+
+    assert.equal(renderCount, 1);
+    assert.equal(container.querySelectorAll('span').length, 1);
+    assert.equal(container.querySelectorAll('em').length, 1);
+
+    cond.set(false);
+    await afterFlush();
+    assert.equal(
+      unmountCount,
+      1,
+      'onUnmount fires for Fragment-returning component',
+    );
+    assert.equal(container.childNodes.length, 0);
+
+    cond.set(true);
+    await afterFlush();
+    assert.equal(renderCount, 2, 'fresh $constructor() call on re-activation');
+    assert.equal(container.querySelectorAll('span').length, 1);
   });
 });

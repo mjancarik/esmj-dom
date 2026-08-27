@@ -13,6 +13,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.mjs",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.mjs",
+      "require": "./dist/jsx-dev-runtime.cjs"
     }
   },
   "typings": "dist/index.d.ts",
@@ -30,7 +40,7 @@
     "postversion": "git push && git push --tags",
     "commit": "node_modules/.bin/git-cz",
     "changelog": "node_modules/.bin/conventional-changelog -p angular -i CHANGELOG.md -s -r 1",
-    "build": "node_modules/.bin/tsup --dts",
+    "build": "node_modules/.bin/tsup --dts && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts",
     "prepare": "husky install"
   },
   "repository": {

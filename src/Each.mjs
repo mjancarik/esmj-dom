@@ -15,15 +15,18 @@
 //
 //   renderFn receives a read-only signal { get() } — no .set().
 //   Access item fields reactively: `() => item.get().text`.
+//   renderFn may also return a Fragment — each of its children is tracked
+//   and reordered/removed as a group. See resolveRenderedNodes in
+//   createElement.mjs.
 //
-// Imports: component.mjs, lifecycle.mjs, @esmj/signals, easy-uid
+// Imports: component.mjs, createElement.mjs, @esmj/signals, easy-uid
 // ---------------------------------------------------------------------------
 
 import { computed, createSignal, effect } from '@esmj/signals';
 import uid from 'easy-uid';
 
-import { isComponentInstance } from './componentInstance.mjs';
-import { cleanupTree, runMountHooks } from './lifecycle.mjs';
+import { removeRenderedNodes, resolveRenderedNodes } from './createElement.mjs';
+import { runMountHooks } from './lifecycle.mjs';
 import {
   addDisposer,
   deepEqual,
@@ -65,7 +68,7 @@ export function Each(itemsAccessor, keyFn, renderFn) {
   // context is null, so we restore it manually around renderFn calls.
   const capturedContext = getInternalContext();
 
-  // currentEntries: Array<{ key, element: Node | null }>
+  // currentEntries: Array<{ key, nodes: Node[] }>
   let currentEntries = [];
 
   // Per-key item signals. Kept alive as long as the key is in the list.
@@ -115,47 +118,43 @@ export function Each(itemsAccessor, keyFn, renderFn) {
         itemSignalMap.set(key, itemSignal);
 
         const readonlySignal = { ...itemSignal, set() {} };
-        const entry = { key, element: null };
+        const entry = { key, nodes: [] };
 
-        //untrack(() => {
-        let child;
         withContext(capturedContext, () => {
-          child = renderFn(readonlySignal, i);
-
-          if (child instanceof Node) {
-            entry.element = child;
-          } else if (isComponentInstance(child)) {
-            const element = child.$constructor();
-            entry.element = element instanceof Node ? element : null;
-            queueMicrotask(() => runMountHooks(child));
+          const child = renderFn(readonlySignal, i);
+          const { nodes, instance } = resolveRenderedNodes(child);
+          entry.nodes = nodes;
+          if (instance) {
+            queueMicrotask(() => runMountHooks(instance));
           }
         });
-        //});
 
         newEntries.push(entry);
       }
     }
 
     // Remove entries whose keys are no longer present.
-    // cleanupTree handles both element _disposers and component lifecycle —
-    // no need for redundant explicit runUnmountHooks / disposeComponent calls.
+    // removeRenderedNodes handles both element disposers and component
+    // lifecycle (owned = true) — no need for redundant explicit
+    // runUnmountHooks / disposeComponent calls.
     for (const [key, entry] of oldMap) {
-      if (entry.element) {
-        cleanupTree(entry.element);
-        entry.element.remove();
-      }
+      removeRenderedNodes(entry.nodes);
       itemSignalMap.delete(key);
     }
 
     // Reorder DOM children to match the new order using minimal moves.
-    const currentChildren = container.childNodes;
-    for (let i = 0; i < newEntries.length; i++) {
-      const entry = newEntries[i];
-      if (!entry.element) continue;
-
-      const currentChild = currentChildren[i];
-      if (currentChild !== entry.element) {
-        container.insertBefore(entry.element, currentChild || null);
+    // Walk backwards, tracking the node each entry's nodes must precede, so
+    // multi-node entries (Fragment results) are kept together as a block
+    // without relying on fixed child-index positions.
+    let nextNode = null;
+    for (let i = newEntries.length - 1; i >= 0; i--) {
+      const nodes = newEntries[i].nodes;
+      for (let j = nodes.length - 1; j >= 0; j--) {
+        const node = nodes[j];
+        if (node.parentNode !== container || node.nextSibling !== nextNode) {
+          container.insertBefore(node, nextNode);
+        }
+        nextNode = node;
       }
     }
 

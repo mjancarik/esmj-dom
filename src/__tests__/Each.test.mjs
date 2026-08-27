@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
-import { renderChild } from '../createElement.mjs';
+import { createElement, Fragment, renderChild } from '../createElement.mjs';
 import { Each } from '../Each.mjs';
 import { onUnmount } from '../lifecycle.mjs';
 
@@ -259,5 +259,132 @@ describe('Each — defensive key handling', () => {
     } finally {
       console.error = originalConsoleError;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fragment items (regression test for the DocumentFragment-empties-itself
+// bug — a renderFn returning a Fragment must have all of its top-level
+// children tracked/reordered/removed as one group)
+// ---------------------------------------------------------------------------
+
+describe('Each — Fragment items', () => {
+  it('renders each Fragment item as multiple sibling nodes, in order, interleaved with single-node items', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+      { id: 3, text: 'c' },
+    ]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const item = itemSig.get();
+        if (item.id === 2) {
+          const s1 = document.createElement('b');
+          s1.textContent = `${item.text}1`;
+          const s2 = document.createElement('i');
+          s2.textContent = `${item.text}2`;
+          return createElement(Fragment, {}, [s1, s2]);
+        }
+        const el = document.createElement('li');
+        el.textContent = item.text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    const tags = Array.from(container.childNodes).map((n) => n.tagName);
+    assert.deepEqual(tags, ['LI', 'B', 'I', 'LI']);
+    assert.equal(container.childNodes[1].textContent, 'b1');
+    assert.equal(container.childNodes[2].textContent, 'b2');
+  });
+
+  it('removes all nodes of a Fragment item (and runs onUnmount) when its key is removed from the list', async () => {
+    let unmounted = false;
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+
+    const { createComponentInstance } = await import(
+      '../componentInstance.mjs'
+    );
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const item = itemSig.get();
+        if (item.id === 2) {
+          return createComponentInstance(
+            () => {
+              onUnmount(() => {
+                unmounted = true;
+              });
+              const s1 = document.createElement('b');
+              const s2 = document.createElement('i');
+              return createElement(Fragment, {}, [s1, s2]);
+            },
+            {},
+            null,
+          );
+        }
+        const el = document.createElement('li');
+        el.textContent = item.text;
+        return el;
+      },
+    );
+    await afterFlush();
+    await new Promise((r) => queueMicrotask(r));
+
+    assert.equal(container.childNodes.length, 3); // li + b + i
+
+    items.set([{ id: 1, text: 'a' }]);
+    await afterFlush();
+
+    assert.equal(container.childNodes.length, 1);
+    assert.ok(
+      unmounted,
+      'onUnmount should fire for a removed Fragment-returning item',
+    );
+  });
+
+  it('reorders a Fragment item as a contiguous block along with single-node items', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+      { id: 3, text: 'c' },
+    ]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const item = itemSig.get();
+        if (item.id === 2) {
+          const s1 = document.createElement('b');
+          const s2 = document.createElement('i');
+          return createElement(Fragment, {}, [s1, s2]);
+        }
+        const el = document.createElement('li');
+        el.textContent = item.text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    items.set([
+      { id: 3, text: 'c' },
+      { id: 2, text: 'b' },
+      { id: 1, text: 'a' },
+    ]);
+    await afterFlush();
+
+    const tags = Array.from(container.childNodes).map((n) => n.tagName);
+    assert.deepEqual(tags, ['LI', 'B', 'I', 'LI']);
+    assert.equal(container.childNodes[0].textContent, 'c');
+    assert.equal(container.childNodes[3].textContent, 'a');
   });
 });

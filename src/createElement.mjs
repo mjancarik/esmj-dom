@@ -2,8 +2,8 @@
 // createElement.mjs — DOM element creation with reactive props
 //
 // Imports: component.mjs, lifecycle.mjs, @esmj/signals, easy-uid
-// Exports (public): createElement, renderChild, isSignalLike
-// Exports (internal): clearContainer
+// Exports (public): createElement, renderChild, isSignalLike, Fragment
+// Exports (internal): clearContainer, resolveRenderedNodes, removeRenderedNodes
 // ---------------------------------------------------------------------------
 
 import { effect } from '@esmj/signals';
@@ -76,14 +76,37 @@ export function isSignalLike(value) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Marker used to group children without introducing a wrapping DOM element —
+ * mirrors JSX's `<>...</>` fragment syntax. Passing `Fragment` as the
+ * `nodeName` to `createElement` produces a `DocumentFragment` populated with
+ * the (normalized) children instead of a regular element.
+ *
+ * Note: a `Fragment` returned as the *sole* root value from a function/class
+ * component's `render()` is not fully supported yet — `appendChild` empties a
+ * DocumentFragment into its parent, so the component-level lifecycle
+ * bookkeeping (onMount/onUnmount/effect disposal) attached to that fragment
+ * would never run. Using `Fragment` to group children passed *into* an
+ * element or `mount()` works correctly.
+ */
+export const Fragment = Symbol('Fragment');
+
+/**
  * Create a DOM element (or a lazy component descriptor).
  *
  * Overloads:
  *   createElement(tagName, props, children)
  *   createElement(Component, props, children)   — function component
+ *   createElement(Fragment, props, children)    — grouped children, no wrapper element
  *   createElement(props, children)              — shorthand, defaults to <div>
  */
 export function createElement(nodeName, props, children) {
+  // Fragment → group children into a DocumentFragment, no wrapper element
+  if (nodeName === Fragment) {
+    const fragment = document.createDocumentFragment();
+    appendChildren(fragment, normalizeChildren(children));
+    return fragment;
+  }
+
   // Function component → return a lazy descriptor, not a DOM node yet
   if (typeof nodeName === 'function') {
     return createComponentInstance(nodeName, props || {}, children);
@@ -370,15 +393,87 @@ export function renderChild(parent, child) {
 }
 
 // ---------------------------------------------------------------------------
+// Rendered-node lifecycle helpers — shared by the reactive node slot below,
+// If(), and Each(). All three primitives need to:
+//   1. Turn an arbitrary "child value" (Node, Fragment, component instance
+//      descriptor, primitive, null/boolean) into the actual live DOM node(s)
+//      to insert.
+//   2. Later tear down + detach whatever was inserted.
+//
+// A `Fragment` (DocumentFragment) is expanded into an array of its (still
+// live) children *before* it is inserted anywhere — inserting a
+// DocumentFragment empties it, so there would be nothing left on the
+// fragment object itself to track for later cleanup/removal.
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a renderable value into `{ nodes, instance }`:
+ * - `nodes` — the live DOM node(s) to insert, in order (empty array for
+ *   null/boolean/empty-Fragment values).
+ * - `instance` — the component instance descriptor that produced `nodes`
+ *   (if `value` was one), so the caller can queue its mount hooks.
+ *
+ * Component instances are constructed here (via `$constructor()`); if a
+ * component's render result is itself a Fragment, its bookkeeping has
+ * already been attached to each of the fragment's children individually by
+ * `createComponentInstance` — see componentInstance.mjs.
+ */
+export function resolveRenderedNodes(value) {
+  let instance = null;
+  let resolved = value;
+
+  if (isComponentInstance(value)) {
+    instance = value;
+    resolved = value.$constructor();
+  }
+
+  if (resolved instanceof DocumentFragment) {
+    return { nodes: Array.from(resolved.childNodes), instance };
+  }
+
+  if (resolved instanceof Node) {
+    return { nodes: [resolved], instance };
+  }
+
+  if (resolved == null || resolved === false || resolved === true) {
+    return { nodes: [], instance };
+  }
+
+  return { nodes: [document.createTextNode(String(resolved))], instance };
+}
+
+/**
+ * Tear down and detach DOM nodes previously produced by
+ * `resolveRenderedNodes`.
+ *
+ * @param {Node[]} nodes
+ * @param {boolean} [owned=true]  When true (the default), each node's
+ *   subtree is fully disposed via `cleanupTree` (signal effects + onUnmount
+ *   hooks) before removal. Pass `false` for "borrowed" pre-built nodes whose
+ *   disposers must survive across toggles (see If.mjs).
+ */
+export function removeRenderedNodes(nodes, owned = true) {
+  for (const node of nodes) {
+    if (owned) {
+      cleanupTree(node);
+    }
+    node.remove();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Reactive node slot — handles both DOM Node values and primitives.
 //
 // A comment node acts as a stable anchor. On each signal/function emission:
 //   - If the new value is a DOM Node it is inserted after the anchor.
+//   - If the new value is a Fragment its children are inserted after the
+//     anchor as a group.
 //   - If the new value is a ComponentInstance descriptor (returned by
 //     `createElement(MyComponent, props)`) it is constructed and mounted.
 //   - Otherwise a Text node is created for the stringified value.
-//   - The previous content node is cleaned up and removed before inserting
-//     the next one, so only one live node ever sits after the anchor.
+//   - The previous content node(s) are cleaned up and removed before
+//     inserting the next one(s), so only the latest emission's nodes ever
+//     sit after the anchor.
 //
 // Security note: DOM Node values are inserted as-is, including any event
 // listeners already attached to the node. Never pass a reactive slot that
@@ -390,44 +485,24 @@ function createReactiveNode(parent, fn) {
   const capturedContext = getInternalContext();
   const anchor = document.createComment('');
   parent.appendChild(anchor);
-  let currentNode = null;
+  let currentNodes = [];
 
   const dispose = effect(() => {
     withContext(capturedContext, () => {
       const value = fn();
+      const { nodes: newNodes, instance } = resolveRenderedNodes(value);
 
-      let newNode;
-      let newInstance = null;
+      removeRenderedNodes(currentNodes);
 
-      if (value instanceof Node) {
-        newNode = value;
-      } else if (isComponentInstance(value)) {
-        // A reactive slot may return a component descriptor (the result of
-        // createElement(MyComponent, props)). Construct it here so it
-        // participates in the normal lifecycle instead of rendering as
-        // "[object Object]".
-        newNode = value.$constructor();
-        newInstance = value;
-        if (!(newNode instanceof Node)) newNode = null;
-      } else if (value == null || value === false || value === true) {
-        newNode = null;
-      } else {
-        newNode = document.createTextNode(String(value));
+      if (newNodes.length) {
+        anchor.after(...newNodes);
       }
 
-      if (currentNode) {
-        cleanupTree(currentNode);
-        currentNode.remove();
+      if (instance) {
+        queueMicrotask(() => runMountHooks(instance));
       }
 
-      if (newNode) {
-        anchor.after(newNode);
-        if (newInstance) {
-          queueMicrotask(() => runMountHooks(newInstance));
-        }
-      }
-
-      currentNode = newNode ?? null;
+      currentNodes = newNodes;
     });
   });
 
