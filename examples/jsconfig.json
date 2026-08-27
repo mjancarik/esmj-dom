@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "../src",
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["**/*"]
+}
