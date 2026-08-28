@@ -1,15 +1,17 @@
 // ---------------------------------------------------------------------------
 // Each.mjs — keyed list rendering with reactive item signals
 //
-// API: Each(itemsAccessor, keyFn, renderFn)
+// API: Each(itemsAccessor, keyFn, renderFn, options?)
 //   - itemsAccessor: () => Item[]
 //   - keyFn:         (item: Item, index: number) => string | number
 //   - renderFn:      (itemSignal: Signal<Item>, index: number) => Node
+//   - options.equals: (prev: Item, next: Item) => boolean — default deepEqual
 //
 // Reactive item pattern (Solid.js For):
 //   Each item gets its own Signal<Item>. When the items array is updated:
 //     - Existing key → signal.set(newItem) — in-place reactive update,
-//       no remount, onMount/onUnmount do NOT fire.
+//       no remount, onMount/onUnmount do NOT fire. Whether this actually
+//       notifies subscribers depends on options.equals (see below).
 //     - New key      → fresh signal + fresh DOM via renderFn.
 //     - Removed key  → cleanupTree + DOM removal.
 //
@@ -18,6 +20,18 @@
 //   renderFn may also return a Fragment — each of its children is tracked
 //   and reordered/removed as a group. See resolveRenderedNodes in
 //   createElement.mjs.
+//
+//   options.equals defaults to deepEqual, which skips notifying subscribers
+//   when a replacement item is structurally identical to the previous one.
+//   That's usually desirable, but it breaks contenteditable/DOM-ahead-of-model
+//   UIs: if the DOM has diverged from the model (e.g. mid-edit) and a
+//   programmatic update "corrects" the model to a value that is deep-equal to
+//   what it already held, reactive DOM bindings (e.g. $dangerouslySetInnerHTML)
+//   never re-run and the stale DOM is left in place. Pass a reference-identity
+//   equals (`(a, b) => a === b`) to force every new item object through to
+//   subscribers. Contract: consumers using a custom equals must assign a new
+//   object reference at changed indices — unchanged indices may keep the same
+//   reference to avoid redundant updates.
 //
 // Imports: component.mjs, createElement.mjs, @esmj/signals, easy-uid
 // ---------------------------------------------------------------------------
@@ -47,6 +61,16 @@ import {
  * `renderFn` receives a **read-only** signal `{ get() }` — calling `.set()`
  * is a no-op. Access item fields reactively: `() => item.get().text`.
  *
+ * By default, existing-key updates use structural (`deepEqual`) equality for
+ * the per-item signal, so a replacement item that is deep-equal to the
+ * previous one does **not** notify subscribers — no-op for static lists.
+ * Pass `options.equals` to override this, e.g. reference identity
+ * (`(a, b) => a === b`) for contenteditable/DOM-ahead-of-model UIs, where a
+ * model "correction" that happens to match a prior deep-equal snapshot must
+ * still force reactive DOM bindings to re-run. Contract: consumers relying on
+ * a custom `equals` must assign a **new object reference** at changed indices
+ * for the signal to notify — unchanged indices may keep the same reference.
+ *
  * @template Item
  * @param {() => Item[]} itemsAccessor  Reactive accessor returning the current
  *   array of items.
@@ -54,10 +78,14 @@ import {
  *   stable unique key for each item. Must be unique within the list.
  * @param {(itemSignal: { get(): Item }, index: number) => Node} renderFn
  *   Called once per new key to produce a DOM node for that item.
+ * @param {{ equals?: (prev: Item, next: Item) => boolean }} [options]
+ *   Optional settings. `equals` controls the per-item signal's equality check
+ *   on existing-key updates; defaults to `deepEqual`.
  * @returns {HTMLSpanElement}  A `display:contents` wrapper that is transparent
  *   to CSS layout.
  */
-export function Each(itemsAccessor, keyFn, renderFn) {
+export function Each(itemsAccessor, keyFn, renderFn, options = {}) {
+  const { equals = deepEqual } = options;
   const container = document.createElement('span');
   container.style.display = 'contents';
   container.setAttribute('data-each', uid());
@@ -114,7 +142,7 @@ export function Each(itemsAccessor, keyFn, renderFn) {
         oldMap.delete(key);
       } else {
         // New key: create a fresh item signal and render a new element.
-        const itemSignal = createSignal(item, { equals: deepEqual });
+        const itemSignal = createSignal(item, { equals });
         itemSignalMap.set(key, itemSignal);
 
         const readonlySignal = { ...itemSignal, set() {} };
