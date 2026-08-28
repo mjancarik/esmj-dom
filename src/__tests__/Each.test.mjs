@@ -191,6 +191,101 @@ describe('Each — updating items in-place', () => {
 });
 
 // ---------------------------------------------------------------------------
+// options.equals
+// ---------------------------------------------------------------------------
+
+describe('Each — options.equals', () => {
+  it('default deepEqual skips reactive update for structurally identical replacement item', async () => {
+    let runCount = 0;
+    const items = createSignal([{ id: 1, text: 'same' }]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        renderChild(el, () => {
+          runCount++;
+          return itemSig.get().text;
+        });
+        return el;
+      },
+    );
+    await afterFlush();
+    assert.equal(runCount, 1);
+
+    // New object reference, but deep-equal content -> default equals must
+    // suppress the notification.
+    items.set([{ id: 1, text: 'same' }]);
+    await afterFlush();
+
+    assert.equal(runCount, 1, 'reactive binding must not re-run');
+    assert.equal(container.children[0].textContent, 'same');
+  });
+
+  it('reference-identity equals forces reactive update even when content is deep-equal', async () => {
+    let runCount = 0;
+    const items = createSignal([{ id: 1, text: 'same' }]);
+
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        renderChild(el, () => {
+          runCount++;
+          return itemSig.get().text;
+        });
+        return el;
+      },
+      { equals: (a, b) => a === b },
+    );
+    await afterFlush();
+    assert.equal(runCount, 1);
+
+    // New object reference with the same field values -> custom equals
+    // treats this as a change and must notify subscribers.
+    items.set([{ id: 1, text: 'same' }]);
+    await afterFlush();
+
+    assert.equal(runCount, 2, 'reactive binding must re-run for new reference');
+    assert.equal(container.children[0].textContent, 'same');
+  });
+
+  it('reference-identity equals does not trigger a redundant update for the same object reference', async () => {
+    let runCount = 0;
+    const sharedItem = { id: 1, text: 'same' };
+    const items = createSignal([sharedItem]);
+
+    Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        renderChild(el, () => {
+          runCount++;
+          return itemSig.get().text;
+        });
+        return el;
+      },
+      { equals: (a, b) => a === b },
+    );
+    await afterFlush();
+    assert.equal(runCount, 1);
+
+    // Same object reference reused at the same index -> no change, no update.
+    items.set([sharedItem]);
+    await afterFlush();
+
+    assert.equal(
+      runCount,
+      1,
+      'reactive binding must not re-run for same reference',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Reordering items
 // ---------------------------------------------------------------------------
 

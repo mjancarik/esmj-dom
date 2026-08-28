@@ -15,7 +15,7 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
   - [Component](#component-base-class)
   - [If](#ifcondition-thenchild-elsechild)
   - [Show](#showcondition-child)
-  - [Each](#eachitemsaccessor-keyfn-renderfn)
+  - [Each](#eachitemsaccessor-keyfn-renderfn-options)
   - [Lifecycle Hooks](#lifecycle-hooks)
     - [onMount](#onmountcallback)
     - [onUnmount](#onunmountcallback)
@@ -315,7 +315,7 @@ Show(
 
 ---
 
-### `Each(itemsAccessor, keyFn, renderFn)`
+### `Each(itemsAccessor, keyFn, renderFn, options?)`
 
 Efficiently renders a keyed list. Each item gets its own reactive signal. When the array changes:
 
@@ -329,6 +329,7 @@ Efficiently renders a keyed list. Each item gets its own reactive signal. When t
 | `itemsAccessor` | `() => Item[]` | Returns the current array. |
 | `keyFn` | `(item, index) => string \| number` | Produces a stable key per item. |
 | `renderFn` | `(itemSignal, index) => Node` | Builds the DOM for one item. Called **once per new key** — use `itemSignal.get()` inside reactive expressions to receive in-place updates without remounting. |
+| `options.equals` | `(prev: Item, next: Item) => boolean` | Equality check used by each item's signal on existing-key updates. Defaults to [`deepEqual`](#deepequala-b). |
 
 Returns a `<span style="display:contents">` wrapper.
 
@@ -342,6 +343,29 @@ Each(
   () => todos.get(),
   (item) => item.id,
   (item) => createElement('li', {}, [() => item.get().text]),
+);
+```
+
+**Custom `equals` for contenteditable / DOM-ahead-of-model UIs** — the default
+`deepEqual` skips notifying an item's subscribers when a replacement item is
+structurally identical to the previous one. That's usually the right call for
+static lists, but it breaks editors where the DOM can diverge from the model
+(e.g. mid-edit) and a programmatic update "corrects" the model back to a value
+that's deep-equal to what it already held — reactive bindings like
+`$dangerouslySetInnerHTML` would never re-run, leaving stale DOM behind. Pass
+a reference-identity `equals` and always assign a **new object reference** at
+changed indices to force the update through:
+
+```js
+Each(
+  () => content.get(),
+  (item) => item.id,
+  (itemSignal) =>
+    createElement('p', {
+      contentEditable: true,
+      $dangerouslySetInnerHTML: () => itemSignal.get().text || '<br>',
+    }),
+  { equals: (a, b) => a === b },
 );
 ```
 
