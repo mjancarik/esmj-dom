@@ -84,8 +84,8 @@ import {
  * @returns {HTMLSpanElement}  A `display:contents` wrapper that is transparent
  *   to CSS layout.
  */
-export function Each(itemsAccessor, keyFn, renderFn, options = {}) {
-  const { equals = deepEqual } = options;
+export function Each(itemsAccessor, keyFn, renderFn, options) {
+  const { equals = deepEqual } = options ?? {};
   const container = document.createElement('span');
   container.style.display = 'contents';
   container.setAttribute('data-each', uid());
