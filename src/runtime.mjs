@@ -60,9 +60,10 @@ const UNSUPPORTED_WRAPPER_TAGS = new Set(['template', 'script']);
  * @returns {HTMLElement}
  */
 export function createReconciliationContainer(tagName, dataAttrName) {
-  let resolvedTagName = tagName;
+  const normalizedTagName = (tagName == null ? 'span' : String(tagName)).trim();
+  let resolvedTagName = normalizedTagName;
 
-  if (UNSUPPORTED_WRAPPER_TAGS.has(String(tagName).toLowerCase().trim())) {
+  if (UNSUPPORTED_WRAPPER_TAGS.has(normalizedTagName.toLowerCase())) {
     console.warn(
       `[esmj-dom] tagName "${tagName}" cannot render children in normal flow and is not supported as a reconciliation wrapper; falling back to "span".`,
     );
