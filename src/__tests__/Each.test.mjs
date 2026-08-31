@@ -483,3 +483,101 @@ describe('Each — Fragment items', () => {
     assert.equal(container.childNodes[3].textContent, 'a');
   });
 });
+
+// ---------------------------------------------------------------------------
+// options.tagName — configurable wrapper element
+// ---------------------------------------------------------------------------
+
+describe('Each — options.tagName', () => {
+  it('defaults to a <span> wrapper', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.tagName, 'SPAN');
+  });
+
+  it('uses the given tagName for the wrapper, keeping data-each and display:contents', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    const container = Each(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('tr');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+      { tagName: 'tbody' },
+    );
+    await afterFlush();
+
+    assert.equal(container.tagName, 'TBODY');
+    assert.ok(container.hasAttribute('data-each'));
+    assert.equal(container.style.display, 'contents');
+    assert.equal(container.children.length, 2);
+  });
+
+  it('falls back to <span> with a warning for unsupported wrapper tags', async () => {
+    const originalConsoleWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => {
+      warnings.push(args.join(' '));
+    };
+
+    try {
+      const items = createSignal([{ id: 1, text: 'a' }]);
+      const container = Each(
+        () => items.get(),
+        (item) => item.id,
+        (itemSig) => {
+          const el = document.createElement('li');
+          el.textContent = itemSig.get().text;
+          return el;
+        },
+        { tagName: 'template' },
+      );
+      await afterFlush();
+
+      assert.equal(container.tagName, 'SPAN');
+      assert.equal(warnings.length, 1);
+      assert.match(warnings[0], /tagName "template"/);
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  it('falls back to <span> for unsupported wrapper tags regardless of case', async () => {
+    const originalConsoleWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      const items = createSignal([{ id: 1, text: 'a' }]);
+      const container = Each(
+        () => items.get(),
+        (item) => item.id,
+        (itemSig) => {
+          const el = document.createElement('li');
+          el.textContent = itemSig.get().text;
+          return el;
+        },
+        { tagName: 'SCRIPT' },
+      );
+      await afterFlush();
+
+      assert.equal(container.tagName, 'SPAN');
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+});

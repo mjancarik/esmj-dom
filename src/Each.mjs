@@ -5,7 +5,8 @@
 //   - itemsAccessor: () => Item[]
 //   - keyFn:         (item: Item, index: number) => string | number
 //   - renderFn:      (itemSignal: Signal<Item>, index: number) => Node
-//   - options.equals: (prev: Item, next: Item) => boolean — default deepEqual
+//   - options.equals:  (prev: Item, next: Item) => boolean — default deepEqual
+//   - options.tagName: string — wrapper element tag, default 'span'
 //
 // Reactive item pattern (Solid.js For):
 //   Each item gets its own Signal<Item>. When the items array is updated:
@@ -33,16 +34,16 @@
 //   object reference at changed indices — unchanged indices may keep the same
 //   reference to avoid redundant updates.
 //
-// Imports: component.mjs, createElement.mjs, @esmj/signals, easy-uid
+// Imports: component.mjs, createElement.mjs, @esmj/signals
 // ---------------------------------------------------------------------------
 
 import { computed, createSignal, effect } from '@esmj/signals';
-import uid from 'easy-uid';
 
 import { removeRenderedNodes, resolveRenderedNodes } from './createElement.mjs';
 import { runMountHooks } from './lifecycle.mjs';
 import {
   addDisposer,
+  createReconciliationContainer,
   deepEqual,
   getInternalContext,
   withContext,
@@ -78,17 +79,20 @@ import {
  *   stable unique key for each item. Must be unique within the list.
  * @param {(itemSignal: { get(): Item }, index: number) => Node} renderFn
  *   Called once per new key to produce a DOM node for that item.
- * @param {{ equals?: (prev: Item, next: Item) => boolean }} [options]
+ * @param {{ equals?: (prev: Item, next: Item) => boolean, tagName?: string }} [options]
  *   Optional settings. `equals` controls the per-item signal's equality check
- *   on existing-key updates; defaults to `deepEqual`.
- * @returns {HTMLSpanElement}  A `display:contents` wrapper that is transparent
- *   to CSS layout.
+ *   on existing-key updates; defaults to `deepEqual`. `tagName` sets the
+ *   wrapper element's tag (default `'span'`) — use this when the default
+ *   `<span>` would violate the parent's content model (e.g. `{ tagName:
+ *   'tbody' }` inside a `<table>`). Note: no tag choice fixes `<ul>`/`<ol>`/
+ *   `<select>` parents, which only accept their specific item tag as a
+ *   direct child regardless of wrapper tag — see README.
+ * @returns {HTMLElement}  A `display:contents` wrapper (default `<span>`)
+ *   that is transparent to CSS layout.
  */
 export function Each(itemsAccessor, keyFn, renderFn, options) {
-  const { equals = deepEqual } = options ?? {};
-  const container = document.createElement('span');
-  container.style.display = 'contents';
-  container.setAttribute('data-each', uid());
+  const { equals = deepEqual, tagName = 'span' } = options ?? {};
+  const container = createReconciliationContainer(tagName, 'data-each');
 
   // Capture the component context active when Each() is constructed (i.e. the
   // parent component's context). Newly-created children inside the reactive

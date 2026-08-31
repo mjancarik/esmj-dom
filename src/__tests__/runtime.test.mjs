@@ -4,6 +4,7 @@ import { createSignal } from '@esmj/signals';
 
 import {
   createContext,
+  createReconciliationContainer,
   deepEqual,
   getContext,
   getContextFromElement,
@@ -421,5 +422,57 @@ describe('initNodeInternal / getNodeInternal', () => {
     const el = document.createElement('div');
     initNodeInternal(el);
     assert.ok(getNodeInternal(el) != null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createReconciliationContainer
+// ---------------------------------------------------------------------------
+
+describe('createReconciliationContainer', () => {
+  it('creates a container with the given tagName, attribute and display:contents', () => {
+    const container = createReconciliationContainer('tbody', 'data-each');
+    assert.equal(container.tagName, 'TBODY');
+    assert.ok(container.hasAttribute('data-each'));
+    assert.equal(container.style.display, 'contents');
+  });
+
+  it('uses a random uid as the attribute value on each call', () => {
+    const a = createReconciliationContainer('span', 'data-each');
+    const b = createReconciliationContainer('span', 'data-each');
+    assert.notEqual(a.getAttribute('data-each'), b.getAttribute('data-each'));
+  });
+
+  it('falls back to span for unsupported wrapper tags regardless of case', () => {
+    const originalConsoleWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => {
+      warnings.push(args.join(' '));
+    };
+
+    try {
+      const container = createReconciliationContainer('TEMPLATE', 'data-if');
+      assert.equal(container.tagName, 'SPAN');
+      assert.equal(warnings.length, 1);
+      assert.match(warnings[0], /tagName "TEMPLATE"/);
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  it('falls back to span for "script" with mixed case and surrounding whitespace', () => {
+    const originalConsoleWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      const container = createReconciliationContainer(' ScRiPt ', 'data-if');
+      assert.equal(container.tagName, 'SPAN');
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  it('propagates the DOM exception for an invalid (empty) tagName', () => {
+    assert.throws(() => createReconciliationContainer('', 'data-each'));
   });
 });
