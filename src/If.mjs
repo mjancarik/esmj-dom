@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
 // If.mjs — conditional rendering primitive
 //
-// API (v2 style): If(condition, thenChild, elseChild)
+// API (v2 style): If(condition, thenChild, elseChild, options?)
 //   - condition:  () => boolean
 //   - thenChild:  pre-built Node OR component instance descriptor
 //   - elseChild:  pre-built Node OR component instance descriptor (optional)
+//   - options.tagName: string — wrapper element tag, default 'span'
 //
 // Ownership model (fixes the v2 clearContainer bug):
 //   - Pre-built Node (passed in directly): BORROWED — only detach on branch
@@ -27,11 +28,10 @@
 // ---------------------------------------------------------------------------
 
 import { computed, effect, untrack } from '@esmj/signals';
-import uid from 'easy-uid';
 import { isComponentInstance } from './componentInstance.mjs';
 import { removeRenderedNodes, resolveRenderedNodes } from './createElement.mjs';
 import { runMountHooks } from './lifecycle.mjs';
-import { addDisposer } from './runtime.mjs';
+import { addDisposer, createReconciliationContainer } from './runtime.mjs';
 
 /**
  * Conditional rendering primitive — renders one of two branches based on a
@@ -50,15 +50,20 @@ import { addDisposer } from './runtime.mjs';
  *   signal change it depends on.
  * @param {T} thenChild  Branch rendered when `condition` is truthy.
  * @param {T} [elseChild]  Branch rendered when `condition` is falsy (optional).
- * @returns {HTMLSpanElement}  A `display:contents` wrapper that is transparent
- *   to CSS layout.
+ * @param {{ tagName?: string }} [options]  Optional settings. `tagName` sets
+ *   the wrapper element's tag (default `'span'`) — use this when the default
+ *   `<span>` would violate the parent's content model (e.g. `{ tagName:
+ *   'tbody' }` inside a `<table>`). Note: no tag choice fixes `<ul>`/`<ol>`/
+ *   `<select>` parents, which only accept their specific item tag as a
+ *   direct child regardless of wrapper tag — see README.
+ * @returns {HTMLElement}  A `display:contents` wrapper (default `<span>`)
+ *   that is transparent to CSS layout.
  */
-export function If(condition, thenChild, elseChild) {
+export function If(condition, thenChild, elseChild, options) {
+  const { tagName = 'span' } = options ?? {};
   // display:contents makes the wrapper invisible to CSS layout while its
   // children participate in the parent's layout normally.
-  const container = document.createElement('span');
-  container.style.display = 'contents';
-  container.setAttribute('data-if', uid());
+  const container = createReconciliationContainer(tagName, 'data-if');
 
   // Borrowed branches (anything that is not a component instance — a plain
   // Node, a pre-built Fragment, or a primitive) are resolved to their live

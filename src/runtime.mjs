@@ -36,6 +36,45 @@ export function keepLiteral(value) {
   return keepValue;
 }
 
+// Tags that cannot render children in normal flow: <template>'s children
+// live in `.content` (a separate DocumentFragment), not the light DOM, and
+// <script> never renders children as DOM. Neither can act as a transparent
+// reconciliation wrapper for Each/If.
+const UNSUPPORTED_WRAPPER_TAGS = new Set(['template', 'script']);
+
+/**
+ * Create the `display:contents` reconciliation wrapper shared by `Each` and
+ * `If`. Defaults to `<span>`; pass `tagName` to use a different element when
+ * the default wrapper would violate the parent's content model (e.g. a
+ * `<table>`/`<select>` that only accepts specific child tags).
+ *
+ * Note: no tag is valid as a transparent wrapper inside `<ul>`/`<ol>`/
+ * `<select>` — those elements only accept their specific item tag
+ * (`<li>`/`<option>`) as direct children, regardless of `display`. This
+ * option does not solve that case; see the README's "Known limitation" note.
+ *
+ * @param {string} tagName  Element tag to create (defaults to `'span'` by
+ *   the caller, not here).
+ * @param {string} dataAttrName  Attribute name used to mark the wrapper for
+ *   debugging (e.g. `'data-each'`, `'data-if'`); value is a random uid.
+ * @returns {HTMLElement}
+ */
+export function createReconciliationContainer(tagName, dataAttrName) {
+  let resolvedTagName = tagName;
+
+  if (UNSUPPORTED_WRAPPER_TAGS.has(String(tagName).toLowerCase().trim())) {
+    console.warn(
+      `[esmj-dom] tagName "${tagName}" cannot render children in normal flow and is not supported as a reconciliation wrapper; falling back to "span".`,
+    );
+    resolvedTagName = 'span';
+  }
+
+  const container = document.createElement(resolvedTagName);
+  container.style.display = 'contents';
+  container.setAttribute(dataAttrName, uid());
+  return container;
+}
+
 /**
  * Create a signal-shaped ref object.
  *

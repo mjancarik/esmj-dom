@@ -13,7 +13,7 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
   - [createElement](#createelementtagnamecomponent-props-children)
   - [Fragment & JSX support](#fragment--jsx-support)
   - [Component](#component-base-class)
-  - [If](#ifcondition-thenchild-elsechild)
+  - [If](#ifcondition-thenchild-elsechild-options)
   - [Show](#showcondition-child)
   - [Each](#eachitemsaccessor-keyfn-renderfn-options)
   - [Lifecycle Hooks](#lifecycle-hooks)
@@ -258,7 +258,7 @@ createElement(MyCard, { label: 'Hello' }, [
 
 ---
 
-### `If(condition, thenChild, elseChild?)`
+### `If(condition, thenChild, elseChild?, options?)`
 
 Conditionally renders one of two branches. When the branch changes, the inactive branch is removed from the DOM (component instances are fully torn down; lifecycle hooks fire).
 
@@ -276,8 +276,11 @@ Use `If` when you need DOM teardown and lifecycle hooks. Use [`Show`](#showcondi
 | `condition` | `() => boolean` | Reactive condition accessor. |
 | `thenChild` | `Node \| ComponentInstance` | Rendered when condition is truthy. |
 | `elseChild` | `Node \| ComponentInstance` | Optional. Rendered when condition is falsy. |
+| `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). |
 
-Returns a `<span style="display:contents">` wrapper that is invisible to CSS layout.
+Returns a `display:contents` wrapper (default `<span>`, configurable via `options.tagName`) that is invisible to CSS layout.
+
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children, regardless of the wrapper's `display` style. Avoid `If`/`Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const isLoggedIn = createSignal(false);
@@ -297,7 +300,7 @@ Toggles an element's `display` style between `''` and `'none'`. The element
 **stays in the DOM** while visibility changes — no teardown and no lifecycle
 hooks on show/hide toggles.
 
-Use `Show` to preserve component state or skip remounting cost. Use [`If`](#ifcondition-thenchild-elsechild) for full teardown semantics.
+Use `Show` to preserve component state or skip remounting cost. Use [`If`](#ifcondition-thenchild-elsechild-options) for full teardown semantics.
 
 | Param | Type | Description |
 |---|---|---|
@@ -330,8 +333,11 @@ Efficiently renders a keyed list. Each item gets its own reactive signal. When t
 | `keyFn` | `(item, index) => string \| number` | Produces a stable key per item. |
 | `renderFn` | `(itemSignal, index) => Node` | Builds the DOM for one item. Called **once per new key** — use `itemSignal.get()` inside reactive expressions to receive in-place updates without remounting. |
 | `options.equals` | `(prev: Item, next: Item) => boolean` | Equality check used by each item's signal on existing-key updates. Defaults to [`deepEqual`](#deepequala-b). |
+| `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). |
 
-Returns a `<span style="display:contents">` wrapper.
+Returns a `display:contents` wrapper (default `<span>`, configurable via `options.tagName`).
+
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children, regardless of the wrapper's `display` style. Avoid `Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const todos = createSignal([

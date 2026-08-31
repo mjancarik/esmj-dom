@@ -285,3 +285,75 @@ describe('If — Fragment children', () => {
     assert.equal(container.querySelectorAll('span').length, 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// options.tagName — configurable wrapper element
+// ---------------------------------------------------------------------------
+
+describe('If — options.tagName', () => {
+  it('defaults to a <span> wrapper', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('p');
+
+    const container = If(() => cond.get(), thenEl);
+    await afterFlush();
+
+    assert.equal(container.tagName, 'SPAN');
+  });
+
+  it('uses the given tagName for the wrapper, keeping data-if and display:contents', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('tr');
+
+    const container = If(() => cond.get(), thenEl, null, { tagName: 'tbody' });
+    await afterFlush();
+
+    assert.equal(container.tagName, 'TBODY');
+    assert.ok(container.hasAttribute('data-if'));
+    assert.equal(container.style.display, 'contents');
+    assert.ok(container.contains(thenEl));
+  });
+
+  it('falls back to <span> with a warning for unsupported wrapper tags', async () => {
+    const originalConsoleWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => {
+      warnings.push(args.join(' '));
+    };
+
+    try {
+      const cond = createSignal(true);
+      const thenEl = document.createElement('p');
+
+      const container = If(() => cond.get(), thenEl, null, {
+        tagName: 'script',
+      });
+      await afterFlush();
+
+      assert.equal(container.tagName, 'SPAN');
+      assert.equal(warnings.length, 1);
+      assert.match(warnings[0], /tagName "script"/);
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+
+  it('falls back to <span> for unsupported wrapper tags regardless of case', async () => {
+    const originalConsoleWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      const cond = createSignal(true);
+      const thenEl = document.createElement('p');
+
+      const container = If(() => cond.get(), thenEl, null, {
+        tagName: 'Template',
+      });
+      await afterFlush();
+
+      assert.equal(container.tagName, 'SPAN');
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+  });
+});
