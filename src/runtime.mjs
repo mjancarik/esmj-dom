@@ -43,15 +43,23 @@ export function keepLiteral(value) {
 const UNSUPPORTED_WRAPPER_TAGS = new Set(['template', 'script']);
 
 /**
- * Create the `display:contents` reconciliation wrapper shared by `Each` and
- * `If`. Defaults to `<span>`; pass `tagName` to use a different element when
- * the default wrapper would violate the parent's content model (e.g. a
- * `<table>`/`<select>` that only accepts specific child tags).
+ * Create the reconciliation wrapper shared by `Each` and `If`. Defaults to
+ * `<span>`; pass `tagName` to use a different element when the default
+ * wrapper would violate the parent's content model (e.g. a `<table>`/
+ * `<select>` that only accepts specific child tags).
+ *
+ * `display:contents` is only applied to the default/fallback `<span>` — a
+ * generic element with no content-model role of its own, so it must be
+ * hidden from layout to stay "transparent". An explicitly chosen `tagName`
+ * (e.g. `'tbody'`, `'li'`) is assumed to already be a semantically valid
+ * element for its context and is left with its normal `display`; forcing
+ * `display:contents` on it would strip away behavior the caller presumably
+ * wants (e.g. `<li>`'s marker, `<tbody>`'s row-group box).
  *
  * Note: no tag is valid as a transparent wrapper inside `<ul>`/`<ol>`/
  * `<select>` — those elements only accept their specific item tag
- * (`<li>`/`<option>`) as direct children, regardless of `display`. This
- * option does not solve that case; see the README's "Known limitation" note.
+ * (`<li>`/`<option>`) as direct children. This option does not solve that
+ * case; see the README's "Known limitation" note.
  *
  * @param {string} tagName  Element tag to create (defaults to `'span'` by
  *   the caller, not here).
@@ -71,7 +79,10 @@ export function createReconciliationContainer(tagName, dataAttrName) {
   }
 
   const container = document.createElement(resolvedTagName);
-  container.style.display = 'contents';
+  if (resolvedTagName === 'span') {
+    container.style.display = 'contents';
+  }
+
   container.setAttribute(dataAttrName, uid());
   return container;
 }

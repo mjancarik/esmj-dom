@@ -56,13 +56,16 @@ import { addDisposer, createReconciliationContainer } from './runtime.mjs';
  *   'tbody' }` inside a `<table>`). Note: no tag choice fixes `<ul>`/`<ol>`/
  *   `<select>` parents, which only accept their specific item tag as a
  *   direct child regardless of wrapper tag — see README.
- * @returns {HTMLElement}  A `display:contents` wrapper (default `<span>`)
- *   that is transparent to CSS layout.
+ * @returns {HTMLElement}  The wrapper element. Only the default/fallback
+ *   `<span>` gets `display:contents` (to stay transparent to CSS layout); an
+ *   explicitly chosen `tagName` keeps its normal display since it's assumed
+ *   to already be valid for its context (e.g. `'tbody'` in a `<table>`).
  */
 export function If(condition, thenChild, elseChild, options) {
   const { tagName = 'span' } = options ?? {};
-  // display:contents makes the wrapper invisible to CSS layout while its
-  // children participate in the parent's layout normally.
+  // display:contents (applied only to the default <span>, see
+  // createReconciliationContainer) makes the wrapper invisible to CSS
+  // layout while its children participate in the parent's layout normally.
   const container = createReconciliationContainer(tagName, 'data-if');
 
   // Borrowed branches (anything that is not a component instance — a plain

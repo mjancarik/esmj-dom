@@ -87,8 +87,10 @@ import {
  *   'tbody' }` inside a `<table>`). Note: no tag choice fixes `<ul>`/`<ol>`/
  *   `<select>` parents, which only accept their specific item tag as a
  *   direct child regardless of wrapper tag — see README.
- * @returns {HTMLElement}  A `display:contents` wrapper (default `<span>`)
- *   that is transparent to CSS layout.
+ * @returns {HTMLElement}  The wrapper element. Only the default/fallback
+ *   `<span>` gets `display:contents` (to stay transparent to CSS layout); an
+ *   explicitly chosen `tagName` keeps its normal display since it's assumed
+ *   to already be valid for its context (e.g. `'tbody'` in a `<table>`).
  */
 export function Each(itemsAccessor, keyFn, renderFn, options) {
   const { equals = deepEqual, tagName = 'span' } = options ?? {};

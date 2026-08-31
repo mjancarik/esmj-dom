@@ -505,7 +505,7 @@ describe('Each — options.tagName', () => {
     assert.equal(container.tagName, 'SPAN');
   });
 
-  it('uses the given tagName for the wrapper, keeping data-each and display:contents', async () => {
+  it('uses the given tagName for the wrapper, keeping data-each without forcing display:contents', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
       { id: 2, text: 'b' },
@@ -524,7 +524,7 @@ describe('Each — options.tagName', () => {
 
     assert.equal(container.tagName, 'TBODY');
     assert.ok(container.hasAttribute('data-each'));
-    assert.equal(container.style.display, 'contents');
+    assert.equal(container.style.display, '');
     assert.equal(container.children.length, 2);
   });
 

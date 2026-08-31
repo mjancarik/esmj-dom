@@ -278,9 +278,9 @@ Use `If` when you need DOM teardown and lifecycle hooks. Use [`Show`](#showcondi
 | `elseChild` | `Node \| ComponentInstance` | Optional. Rendered when condition is falsy. |
 | `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). If you want to pass `options` without an `elseChild`, pass `null` as the 3rd argument: `If(cond, thenChild, null, { tagName: 'tbody' })`. |
 
-Returns a `display:contents` wrapper (default `<span>`, configurable via `options.tagName`) that is invisible to CSS layout.
+Returns the wrapper element (default `<span>`, configurable via `options.tagName`). Only the default/fallback `<span>` gets `display:contents` (invisible to CSS layout) — an explicitly chosen `tagName` keeps its normal display, since it's assumed to already be a valid element for its context (e.g. a real `<tbody>` doesn't need hiding to behave correctly inside a `<table>`).
 
-> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children, regardless of the wrapper's `display` style. Avoid `If`/`Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `If`/`Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const isLoggedIn = createSignal(false);
@@ -335,9 +335,9 @@ Efficiently renders a keyed list. Each item gets its own reactive signal. When t
 | `options.equals` | `(prev: Item, next: Item) => boolean` | Equality check used by each item's signal on existing-key updates. Defaults to [`deepEqual`](#deepequala-b). |
 | `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). |
 
-Returns a `display:contents` wrapper (default `<span>`, configurable via `options.tagName`).
+Returns the wrapper element (default `<span>`, configurable via `options.tagName`). Only the default/fallback `<span>` gets `display:contents` — an explicitly chosen `tagName` keeps its normal display, since it's assumed to already be a valid element for its context.
 
-> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children, regardless of the wrapper's `display` style. Avoid `Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const todos = createSignal([

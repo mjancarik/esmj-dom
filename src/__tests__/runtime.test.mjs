@@ -430,11 +430,18 @@ describe('initNodeInternal / getNodeInternal', () => {
 // ---------------------------------------------------------------------------
 
 describe('createReconciliationContainer', () => {
-  it('creates a container with the given tagName, attribute and display:contents', () => {
+  it('creates a default <span> container with display:contents', () => {
+    const container = createReconciliationContainer(undefined, 'data-each');
+    assert.equal(container.tagName, 'SPAN');
+    assert.ok(container.hasAttribute('data-each'));
+    assert.equal(container.style.display, 'contents');
+  });
+
+  it('creates a container with a custom tagName and attribute, without display:contents', () => {
     const container = createReconciliationContainer('tbody', 'data-each');
     assert.equal(container.tagName, 'TBODY');
     assert.ok(container.hasAttribute('data-each'));
-    assert.equal(container.style.display, 'contents');
+    assert.equal(container.style.display, '');
   });
 
   it('uses a random uid as the attribute value on each call', () => {

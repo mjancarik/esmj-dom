@@ -301,7 +301,7 @@ describe('If — options.tagName', () => {
     assert.equal(container.tagName, 'SPAN');
   });
 
-  it('uses the given tagName for the wrapper, keeping data-if and display:contents', async () => {
+  it('uses the given tagName for the wrapper, keeping data-if without forcing display:contents', async () => {
     const cond = createSignal(true);
     const thenEl = document.createElement('tr');
 
@@ -310,7 +310,7 @@ describe('If — options.tagName', () => {
 
     assert.equal(container.tagName, 'TBODY');
     assert.ok(container.hasAttribute('data-if'));
-    assert.equal(container.style.display, 'contents');
+    assert.equal(container.style.display, '');
     assert.ok(container.contains(thenEl));
   });
 
