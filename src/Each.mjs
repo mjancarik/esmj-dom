@@ -34,7 +34,7 @@
 //   object reference at changed indices — unchanged indices may keep the same
 //   reference to avoid redundant updates.
 //
-// Imports: component.mjs, createElement.mjs, @esmj/signals, easy-uid
+// Imports: component.mjs, createElement.mjs, @esmj/signals
 // ---------------------------------------------------------------------------
 
 import { computed, createSignal, effect } from '@esmj/signals';

@@ -24,7 +24,7 @@
 // fresh Fragment is produced by $constructor() on every re-activation). See
 // resolveRenderedNodes/removeRenderedNodes in createElement.mjs.
 //
-// Imports: component.mjs, createElement.mjs, lifecycle.mjs, @esmj/signals, easy-uid
+// Imports: component.mjs, createElement.mjs, lifecycle.mjs, @esmj/signals
 // ---------------------------------------------------------------------------
 
 import { computed, effect, untrack } from '@esmj/signals';
