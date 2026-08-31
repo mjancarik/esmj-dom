@@ -276,7 +276,7 @@ Use `If` when you need DOM teardown and lifecycle hooks. Use [`Show`](#showcondi
 | `condition` | `() => boolean` | Reactive condition accessor. |
 | `thenChild` | `Node \| ComponentInstance` | Rendered when condition is truthy. |
 | `elseChild` | `Node \| ComponentInstance` | Optional. Rendered when condition is falsy. |
-| `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). |
+| `options.tagName` | `string` | Optional. Tag name for the wrapper element. Defaults to `'span'`. Use this when the wrapper's parent element only accepts specific direct children (e.g. `{ tagName: 'tbody' }` inside a `<table>`). If you want to pass `options` without an `elseChild`, pass `null` as the 3rd argument: `If(cond, thenChild, null, { tagName: 'tbody' })`. |
 
 Returns a `display:contents` wrapper (default `<span>`, configurable via `options.tagName`) that is invisible to CSS layout.
 
