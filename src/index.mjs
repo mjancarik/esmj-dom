@@ -5,7 +5,7 @@ export {
   isSignalLike,
   renderChild,
 } from './createElement.mjs';
-export { For } from './For.mjs';
+export { For, For as Each } from './For.mjs';
 export { If } from './If.mjs';
 export { afterRender, onEffect, onMount, onUnmount } from './lifecycle.mjs';
 export { mount, unmount } from './mount.mjs';
