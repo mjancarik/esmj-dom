@@ -29,9 +29,9 @@ const KEEP_LITERAL = Symbol('keep-literal');
  * must reach `applyProps` unwrapped, exactly like a regular element's
  * props, for signal/function values to be handled correctly).
  *
- * This is used internally by control-flow-style components (`For`, `If`,
- * `Toggle`) whose props include plain multi-argument callback functions
- * (e.g. a `key` function `(item, index) => id`) or literal values used
+ * This is used internally by control-flow-style components (`For`, `If`) whose
+ * props include plain multi-argument callback functions (e.g. a `keyFn`
+ * `(item, index) => id`) or literal values used
  * directly (e.g. a `tagName` string, a `fallback` Node) that must NOT be
  * wrapped — `normalizeProps` assumes function props are zero-arg reactive
  * accessors and plain values should become signals, which would break
