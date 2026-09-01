@@ -95,9 +95,8 @@ import {
  *   fixes `<ul>`/`<ol>`/`<select>` parents, which only accept their specific
  *   item tag as a direct child regardless of wrapper tag — see README. Any
  *   other key (`class`, `$ref`, `style`, `onClick`, `data-*`, …) is applied
- *   to the wrapper element via the same `applyProps` logic used for
- *   regular DOM elements — static values, functions, and signals are all
- *   supported.
+ *   to the wrapper element via the same `applyProps` logic used for regular
+ *   DOM elements (i.e. it follows `createElement`'s per-prop handling rules).
  * @returns {HTMLElement}  The wrapper element. Only the default/fallback
  *   `<span>` gets `display:contents` (to stay transparent to CSS layout); an
  *   explicitly chosen `tagName` keeps its normal display since it's assumed
