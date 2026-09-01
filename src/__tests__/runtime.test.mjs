@@ -17,6 +17,7 @@ import {
   setContext,
   setInternalContext,
   setNodeComponent,
+  toAccessor,
   useRef,
   withContext,
 } from '../runtime.mjs';
@@ -89,6 +90,30 @@ describe('normalizeProps', () => {
     assert.equal(protoDescriptor.value.get().isAdmin, true);
     assert.equal(result.safe.get(), 1);
   });
+
+  it('passes props listed in the rawKeys argument through unwrapped', () => {
+    const keyFn = (item) => item.id;
+    const result = normalizeProps({ key: keyFn, tagName: 'tbody', count: 5 }, [
+      'key',
+      'tagName',
+    ]);
+
+    assert.equal(result.key, keyFn);
+    assert.equal(result.tagName, 'tbody');
+    // "count" is not in rawKeys — still normalized.
+    assert.ok(typeof result.count.get === 'function');
+    assert.equal(result.count.get(), 5);
+  });
+
+  it('normalizes everything when rawKeys is omitted or empty', () => {
+    const keyFn = (item) => item.id;
+    const result = normalizeProps({ key: keyFn }, []);
+    // Wrapped in computed() — signal-like, and no longer the raw function
+    // reference (calling .get() would invoke keyFn() with no args, which is
+    // not a meaningful assertion here — just check the wrapping happened).
+    assert.ok(typeof result.key.get === 'function');
+    assert.notEqual(result.key, keyFn);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -122,6 +147,37 @@ describe('keepLiteral', () => {
   it('preserves undefined as literal through normalizeProps', () => {
     const result = normalizeProps({ value: keepLiteral(undefined) });
     assert.equal(result.value, undefined);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toAccessor
+// ---------------------------------------------------------------------------
+
+describe('toAccessor', () => {
+  it('returns a plain function as-is', () => {
+    const fn = () => 42;
+    assert.equal(toAccessor(fn), fn);
+  });
+
+  it('wraps a signal-like value in a zero-arg accessor calling .get()', () => {
+    const sig = createSignal('hello');
+    const accessor = toAccessor(sig);
+    assert.equal(typeof accessor, 'function');
+    assert.equal(accessor(), 'hello');
+
+    sig.set('world');
+    assert.equal(accessor(), 'world');
+  });
+
+  it('wraps a static value in a zero-arg accessor returning it unchanged', () => {
+    const accessor = toAccessor(42);
+    assert.equal(accessor(), 42);
+  });
+
+  it('wraps null/undefined in a zero-arg accessor returning them unchanged', () => {
+    assert.equal(toAccessor(null)(), null);
+    assert.equal(toAccessor(undefined)(), undefined);
   });
 });
 

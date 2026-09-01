@@ -10,6 +10,92 @@ export const NODE_INTERNAL = Symbol('node-internal');
 const KEEP_LITERAL = Symbol('keep-literal');
 
 /**
+ * Marker symbol for declaring which props of a function component must
+ * bypass `normalizeProps`'s signal/computed wrapping (see
+ * `componentInstance.mjs`). A component function tagged with
+ * `fn[RAW_PROPS] = ['keyA', 'keyB']` receives those specific prop values
+ * exactly as passed — no wrapping — while every other prop still goes
+ * through the normal per-key normalization (functions → `computed()`,
+ * plain values → `createSignal()`, already-signal-like values passed
+ * through). This only affects prop *normalization* — the calling
+ * convention is the same `fn(props)` used by every function component,
+ * with `children` always merged in as `props.children` (never wrapped,
+ * same as any other component).
+ *
+ * `fn[RAW_PROPS]` may also be a predicate function `(key) => boolean`
+ * instead of an array — used when the set of raw keys can't be enumerated
+ * ahead of time (e.g. `For`/`If` forward arbitrary wrapper DOM props like
+ * `class`/`$ref`/`style`/`onClick` to their container element, and those
+ * must reach `applyProps` unwrapped, exactly like a regular element's
+ * props, for signal/function values to be handled correctly).
+ *
+ * This is used internally by control-flow-style components (`For`, `If`) whose
+ * props include plain multi-argument callback functions (e.g. a `keyFn`
+ * `(item, index) => id`) or literal values used
+ * directly (e.g. a `tagName` string, a `fallback` Node) that must NOT be
+ * wrapped — `normalizeProps` assumes function props are zero-arg reactive
+ * accessors and plain values should become signals, which would break
+ * these props. Reactive props (e.g. `each`/`when`) are deliberately left
+ * OFF each component's raw-key list (or excluded from the predicate) so
+ * they keep getting normalized like any other prop.
+ *
+ * Not exported from `index.mjs` — an internal mechanism, not (yet) a
+ * public API for arbitrary user components.
+ *
+ * @example
+ * For[RAW_PROPS] = ['keyFn', 'equals', 'tagName']; // 'each' stays normalized
+ * If[RAW_PROPS] = (key) => key !== 'when'; // everything except 'when' stays raw
+ */
+export const RAW_PROPS = Symbol('raw-props');
+
+/**
+ * Coerce a value into a zero-arg accessor function, for props that may be
+ * passed as a plain function (accessor), a signal-like object (has `.get()`),
+ * or a static value (evaluated once, non-reactive).
+ *
+ * Used by raw-props control-flow components (`For`, `If`, `Toggle`) to
+ * normalize their `each`/`when` props without going through `normalizeProps`.
+ *
+ * @param {*} value
+ * @returns {() => *}
+ */
+export function toAccessor(value) {
+  if (typeof value === 'function') {
+    return value;
+  }
+  if (value != null && typeof value.get === 'function') {
+    return () => value.get();
+  }
+  return () => value;
+}
+
+/**
+ * Resolve the single child value a RAW_PROPS control-flow component
+ * (`For`, `If`, `Toggle`) should use, from its dual-mode dispatcher.
+ *
+ * componentInstance.mjs always merges `children` into `props.children`, so
+ * that's the primary source. The `fallbackChildren` argument covers direct
+ * calls that bypass componentInstance entirely (e.g. `Toggle({ when }, el)`
+ * in tests), where `props.children` is absent and the caller passed
+ * children as a separate positional argument instead — mirroring each
+ * component's low-level positional shape.
+ *
+ * JSX (both the automatic and classic transforms) may pass a single child
+ * either as a bare value or as a 1-element array, depending on the
+ * transform/compiler used — either shape is unwrapped to the bare value.
+ *
+ * @param {Record<string, *>} props  The component's props object.
+ * @param {*} [fallbackChildren]  Children passed as a separate positional
+ *   argument, used only when `props.children` is `undefined`.
+ * @returns {*}  The resolved single child (unwrapped from a 1-element array).
+ */
+export function resolveChild(props, fallbackChildren) {
+  const children =
+    props.children !== undefined ? props.children : fallbackChildren;
+  return Array.isArray(children) ? children[0] : children;
+}
+
+/**
  * Mark a value to be passed through `normalizeProps` as-is, without being
  * wrapped in a signal or computed.
  *
@@ -39,11 +125,11 @@ export function keepLiteral(value) {
 // Tags that cannot render children in normal flow: <template>'s children
 // live in `.content` (a separate DocumentFragment), not the light DOM, and
 // <script> never renders children as DOM. Neither can act as a transparent
-// reconciliation wrapper for Each/If.
+// reconciliation wrapper for For/If.
 const UNSUPPORTED_WRAPPER_TAGS = new Set(['template', 'script']);
 
 /**
- * Create the reconciliation wrapper shared by `Each` and `If`. Defaults to
+ * Create the reconciliation wrapper shared by `For` and `If`. Defaults to
  * `<span>`; pass `tagName` to use a different element when the default
  * wrapper would violate the parent's content model (e.g. a `<table>`/
  * `<select>` that only accepts specific child tags).
@@ -64,7 +150,7 @@ const UNSUPPORTED_WRAPPER_TAGS = new Set(['template', 'script']);
  * @param {string} tagName  Element tag to create (defaults to `'span'` by
  *   the caller, not here).
  * @param {string} dataAttrName  Attribute name used to mark the wrapper for
- *   debugging (e.g. `'data-each'`, `'data-if'`); value is a random uid.
+ *   debugging (e.g. `'data-for'`, `'data-if'`); value is a random uid.
  * @returns {HTMLElement}
  */
 export function createReconciliationContainer(tagName, dataAttrName) {
@@ -286,15 +372,23 @@ export const disposersRegistry = new Map();
  * without special-casing static vs. reactive values.
  *
  * @param {Record<string, *>} props  Raw props to normalize.
+ * @param {string[]|((key: string) => boolean)} [rawKeys]  Prop keys to pass
+ *   through completely untouched (no signal/computed wrapping), in addition
+ *   to `children`. Either an array of exact keys, or a predicate function
+ *   called with each key — useful when the raw keys can't be enumerated
+ *   ahead of time (e.g. arbitrary wrapper DOM props). See `RAW_PROPS`.
  * @returns {Record<string, { get(): * }>}  Normalized props with signal-like
- *   values.
+ *   values (except `children` and any `rawKeys` entries, which stay literal).
  */
-export function normalizeProps(props) {
+export function normalizeProps(props, rawKeys) {
+  const isRaw =
+    typeof rawKeys === 'function' ? rawKeys : (key) => !!rawKeys?.includes(key);
+
   const result = Object.create(null);
   for (const key of Object.keys(props)) {
     const value = props[key];
-    if (key === 'children') {
-      result[key] = value; // children always passed through raw
+    if (key === 'children' || isRaw(key)) {
+      result[key] = value; // children, or an explicitly-declared raw prop
     } else if (value?.[KEEP_LITERAL]) {
       result[key] = value(); // keepLiteral-wrapped value, call the wrapper to get the literal
     } else if (value != null && typeof value.get === 'function') {
@@ -315,7 +409,7 @@ export function normalizeProps(props) {
  * the same JSON string. Falls back to `false` for values that cannot be
  * serialized (e.g. circular references).
  *
- * Used as the `equals` option for item signals in `Each` to avoid
+ * Used as the `equals` option for item signals in `For` to avoid
  * unnecessary re-renders when an item's data hasn't actually changed.
  *
  * @param {*} a  First value.

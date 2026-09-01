@@ -15,6 +15,7 @@ import {
   initNodeInternal,
   mountHooksRegistry,
   normalizeProps,
+  RAW_PROPS,
   setInternalContext,
   setNodeComponent,
   unmountHooksRegistry,
@@ -55,7 +56,20 @@ export function createComponentInstance(fn, props, children) {
     element: null,
     classInstance: null, // for class components,
     $constructor() {
-      const componentProps = { ...normalizeProps(props ?? {}), children };
+      // Every function component — including RAW_PROPS-tagged control-flow
+      // helpers like For/If/Toggle — is called the exact same way:
+      // `fn(props)`, a single argument, with `children` merged into it as
+      // `props.children` (never signal/computed-wrapped, same as any other
+      // prop `normalizeProps` treats specially). RAW_PROPS only changes
+      // which *other* prop keys bypass normalizeProps's signal/computed
+      // wrapping (e.g. a `keyFn` callback or a literal `tagName` string) —
+      // it does NOT change the calling convention. See runtime.mjs's
+      // RAW_PROPS.
+      const rawKeys = !isClassComponent(fn) ? fn[RAW_PROPS] : undefined;
+      const componentProps = {
+        ...normalizeProps(props ?? {}, rawKeys),
+        children,
+      };
 
       // Use componentId as the context id so that onMount / onUnmount calls
       // inside the component body register under the same key that
@@ -113,7 +127,7 @@ export function createComponentInstance(fn, props, children) {
       //
       // Bug fix: a DocumentFragment result (e.g. from `render() { return
       // <Fragment>...</Fragment>; }`) gets emptied into its parent as soon
-      // as it is appended (mountComponentInstance / renderChild / If / Each
+      // as it is appended (mountComponentInstance / renderChild / If / For
       // all do this) — the bookkeeping must therefore be attached to each of
       // its *top-level children* individually, not to the fragment object
       // itself, otherwise cleanupTree's live-DOM-tree walk would never find

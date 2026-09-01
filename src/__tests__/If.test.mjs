@@ -5,6 +5,7 @@ import { createComponentInstance } from '../componentInstance.mjs';
 import { createElement, Fragment } from '../createElement.mjs';
 import { If } from '../If.mjs';
 import { onUnmount } from '../lifecycle.mjs';
+import { mount } from '../mount.mjs';
 
 // ---------------------------------------------------------------------------
 // Basic rendering
@@ -355,5 +356,89 @@ describe('If — options.tagName', () => {
     } finally {
       console.warn = originalConsoleWarn;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// If — JSX props mode
+// ---------------------------------------------------------------------------
+
+describe('If — JSX props mode', () => {
+  it('renders then-child when called with a props object + children', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+    thenEl.textContent = 'then';
+
+    const container = If({ when: () => cond.get() }, thenEl);
+    await afterFlush();
+
+    assert.ok(container.contains(thenEl));
+  });
+
+  it('accepts children as an array (JSX auto-runtime shape)', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+
+    const container = If({ when: () => cond.get() }, [thenEl]);
+    await afterFlush();
+
+    assert.ok(container.contains(thenEl));
+  });
+
+  it('accepts "when" as a signal directly (not just a function accessor)', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+
+    const container = If({ when: cond }, thenEl);
+    await afterFlush();
+
+    assert.ok(container.contains(thenEl));
+
+    cond.set(false);
+    await afterFlush();
+
+    assert.ok(!container.contains(thenEl));
+  });
+
+  it('renders "fallback" prop when condition is false', async () => {
+    const cond = createSignal(false);
+    const thenEl = document.createElement('span');
+    const fallbackEl = document.createElement('em');
+    fallbackEl.textContent = 'fallback';
+
+    const container = If(
+      { when: () => cond.get(), fallback: fallbackEl },
+      thenEl,
+    );
+    await afterFlush();
+
+    assert.ok(!container.contains(thenEl));
+    assert.ok(container.contains(fallbackEl));
+  });
+
+  it('honors "tagName" prop', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('tr');
+
+    const container = If({ when: () => cond.get(), tagName: 'tbody' }, thenEl);
+    await afterFlush();
+
+    assert.equal(container.tagName, 'TBODY');
+    assert.equal(container.style.display, '');
+  });
+
+  it('works end-to-end through createElement + mount (JSX-style usage)', async () => {
+    const cond = createSignal(true);
+    const root = document.createElement('div');
+    const thenEl = document.createElement('span');
+    thenEl.textContent = 'then';
+
+    const el = createElement(If, { when: () => cond.get() }, thenEl);
+    mount(root, el);
+    await afterFlush();
+
+    const container = root.firstChild;
+    assert.equal(container.tagName, 'SPAN');
+    assert.ok(container.contains(thenEl));
   });
 });

@@ -220,7 +220,18 @@ function setSafeAttribute(element, key, value) {
   element.setAttribute(key, normalizedValue);
 }
 
-function applyProps(element, props) {
+/**
+ * Set attributes, events, refs, and reactive bindings on `element` from a
+ * props object. Exported (in addition to being used by `createElement`
+ * itself) so control-flow components (`For`, `If`) can apply arbitrary
+ * pass-through props (`class`, `$ref`, `style`, `onClick`, `data-*`, etc.) to
+ * their reconciliation wrapper element exactly like a regular DOM element.
+ *
+ * Skips `id` — callers that want to support an `id` prop must set it via
+ * `element.setAttribute('id', props.id)` themselves first, same as
+ * `createElement` does.
+ */
+export function applyProps(element, props) {
   const capturedContext = getInternalContext();
 
   for (let [key, value] of Reflect.ownKeys(props).map((k) => [k, props[k]])) {
@@ -344,13 +355,13 @@ function appendChildren(parent, children) {
 // renderChild — unified child rendering
 //
 // Replaces the split between appendSingleChild (used by createElement) and
-// renderInto (used by If/Each). The old renderInto was missing null/bool
+// renderInto (used by If/For). The old renderInto was missing null/bool
 // guards, signal-like support, and array support.
 // ---------------------------------------------------------------------------
 
 /**
  * Append a single child value (of any supported type) to a parent node.
- * Safe to call from createElement, If, Each, or mount.
+ * Safe to call from createElement, If, For, or mount.
  */
 export function renderChild(parent, child) {
   if (child == null || child === false || child === true) {
@@ -394,7 +405,7 @@ export function renderChild(parent, child) {
 
 // ---------------------------------------------------------------------------
 // Rendered-node lifecycle helpers — shared by the reactive node slot below,
-// If(), and Each(). All three primitives need to:
+// If(), and For(). All three primitives need to:
 //   1. Turn an arbitrary "child value" (Node, Fragment, component instance
 //      descriptor, primitive, null/boolean) into the actual live DOM node(s)
 //      to insert.

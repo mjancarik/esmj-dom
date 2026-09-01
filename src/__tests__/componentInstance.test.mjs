@@ -9,6 +9,7 @@ import {
   isComponentInstance,
   mountComponentInstance,
 } from '../componentInstance.mjs';
+import { RAW_PROPS } from '../runtime.mjs';
 
 // ---------------------------------------------------------------------------
 // isComponentInstance
@@ -238,5 +239,91 @@ describe('mountComponentInstance', () => {
 
     await new Promise((r) => queueMicrotask(r));
     assert.ok(called, 'onMount should be called after microtask');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createComponentInstance — RAW_PROPS per-key opt-out
+// ---------------------------------------------------------------------------
+
+describe('createComponentInstance — RAW_PROPS per-key opt-out', () => {
+  it('passes only the declared raw keys through unnormalized; other props still normalize', () => {
+    let receivedProps = null;
+    const fn = (props) => {
+      receivedProps = props;
+      return document.createElement('div');
+    };
+    fn[RAW_PROPS] = ['key'];
+
+    const keyFn = (item) => item.id;
+    const instance = createComponentInstance(
+      fn,
+      { key: keyFn, count: 5 },
+      null,
+    );
+    instance.$constructor();
+
+    // "key" is in the raw-key list — stays the exact same function reference,
+    // not wrapped in computed().
+    assert.equal(receivedProps.key, keyFn);
+    // "count" is NOT in the raw-key list — still normalized to a signal.
+    assert.ok(typeof receivedProps.count.get === 'function');
+    assert.equal(receivedProps.count.get(), 5);
+  });
+
+  it('merges children into props.children even when RAW_PROPS is present (even an empty list) — same convention as any other function component', () => {
+    let receivedProps = null;
+    let receivedSecondArg = null;
+    const fn = (props, secondArg) => {
+      receivedProps = props;
+      receivedSecondArg = secondArg;
+      return document.createElement('div');
+    };
+    fn[RAW_PROPS] = [];
+
+    const children = [document.createElement('span')];
+    const instance = createComponentInstance(fn, { foo: 'bar' }, children);
+    instance.$constructor();
+
+    // Called with a single argument, like any other function component —
+    // children is merged into props.children, not passed separately.
+    assert.equal(receivedSecondArg, undefined);
+    assert.equal(receivedProps.children, children);
+    // "foo" is not in the (empty) raw-key list, so it's still normalized.
+    assert.ok(typeof receivedProps.foo.get === 'function');
+    assert.equal(receivedProps.foo.get(), 'bar');
+  });
+
+  it('does not affect class components even if a RAW_PROPS class had the marker', () => {
+    class MyComp extends Component {
+      render() {
+        this.receivedProps = this.props;
+        return document.createElement('div');
+      }
+    }
+    // Marking a class component should be a no-op — class components are
+    // never routed through the raw-props branch.
+    MyComp[RAW_PROPS] = ['count'];
+
+    const instance = createComponentInstance(MyComp, { count: 5 }, null);
+    instance.$constructor();
+
+    assert.ok(
+      typeof instance.classInstance.receivedProps.count.get === 'function',
+    );
+    assert.equal(instance.classInstance.receivedProps.count.get(), 5);
+  });
+
+  it('normal (non-tagged) function components still get normalizeProps behavior', () => {
+    let receivedProps = null;
+    const fn = (props) => {
+      receivedProps = props;
+      return document.createElement('div');
+    };
+    const instance = createComponentInstance(fn, { count: 5 }, null);
+    instance.$constructor();
+
+    assert.ok(typeof receivedProps.count.get === 'function');
+    assert.equal(receivedProps.count.get(), 5);
   });
 });
