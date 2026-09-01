@@ -10,7 +10,7 @@ import {
   Component,
   createContext,
   createElement,
-  Each,
+  For,
   getContext,
   If,
   mount,
@@ -109,10 +109,10 @@ describe('Integration: Counter with If (lifecycle hooks)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration 2: TodoList with Each — add / update / delete items
+// Integration 2: TodoList with For — add / update / delete items
 // ---------------------------------------------------------------------------
 
-describe('Integration: TodoList with Each', () => {
+describe('Integration: TodoList with For', () => {
   it('renders initial list and supports add, update, delete', async () => {
     const container = makeContainer();
     const items = createSignal([
@@ -122,7 +122,7 @@ describe('Integration: TodoList with Each', () => {
 
     function TodoList() {
       return createElement('ul', { 'data-testid': 'list' }, [
-        Each(
+        For(
           () => items.get(),
           (item) => item.id,
           (itemSig) => {
@@ -367,10 +367,10 @@ describe('Integration: Show + signal visibility', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration 5: Class component (Item) inside Each
+// Integration 5: Class component (Item) inside For
 // ---------------------------------------------------------------------------
 
-describe('Integration: Class component inside Each', () => {
+describe('Integration: Class component inside For', () => {
   it('renders class components as list items', async () => {
     const container = makeContainer();
     const items = createSignal([
@@ -387,7 +387,7 @@ describe('Integration: Class component inside Each', () => {
 
     function App() {
       return createElement('ul', {}, [
-        Each(
+        For(
           () => items.get(),
           (item) => item.id,
           (itemSig) => createElement(ItemComp, { text: itemSig.get().text }),

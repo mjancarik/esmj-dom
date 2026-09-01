@@ -15,7 +15,8 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
   - [Component](#component-base-class)
   - [If](#ifcondition-thenchild-elsechild-options)
   - [Show](#showcondition-child)
-  - [Each](#eachitemsaccessor-keyfn-renderfn-options)
+  - [Toggle](#toggle-jsx-wrapper-around-show)
+  - [For](#foritemsaccessor-keyfn-renderfn-options)
   - [Lifecycle Hooks](#lifecycle-hooks)
     - [onMount](#onmountcallback)
     - [onUnmount](#onunmountcallback)
@@ -32,7 +33,7 @@ A tiny, reactive DOM library for building component-based UIs in vanilla JavaScr
     - [withContext](#withcontextctx-fn)
 - [Examples](#examples)
   - [Counter with conditional rendering](#counter-with-conditional-rendering)
-  - [Reactive list with Each](#reactive-list-with-each)
+  - [Reactive list with For](#reactive-list-with-for)
   - [Class-based component](#class-based-component)
   - [Context API usage](#context-api-usage)
 - [License](#license)
@@ -84,7 +85,7 @@ Children that are **functions** (`() => someSignal.get()`) are reactive text nod
 - `$dangerouslySetInnerHTML` — accepts a string, `DocumentFragment`, signal, or function and replaces element content reactively.
 - Security guardrails: `srcdoc` is blocked, and URL-like attributes (`href`, `src`, `action`, `formaction`, `xlink:href`) reject `javascript:` values.
 
-**Ownership model** — `If` and `Each` accept two kinds of children:
+**Ownership model** — `If` and `For` accept two kinds of children:
 - **Borrowed Node** (`createElement('div', ...)`) — only detached/re-attached on branch switch; reactive bindings and effects stay alive across toggles.
 - **Owned ComponentInstance** (`createElement(MyComponent, ...)`) — fully torn down (`onUnmount` fires, effects disposed) and freshly created on each activation.
 
@@ -280,7 +281,7 @@ Use `If` when you need DOM teardown and lifecycle hooks. Use [`Show`](#showcondi
 
 Returns the wrapper element (default `<span>`, configurable via `options.tagName`). Only the default/fallback `<span>` gets `display:contents` (invisible to CSS layout) — an explicitly chosen `tagName` keeps its normal display, since it's assumed to already be a valid element for its context (e.g. a real `<tbody>` doesn't need hiding to behave correctly inside a `<table>`).
 
-> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `If`/`Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `If`/`For` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const isLoggedIn = createSignal(false);
@@ -291,6 +292,22 @@ If(
   createElement(LoginForm, {}),
 );
 ```
+
+**JSX usage** — `If` also accepts a props object + children, so it can be used directly as a JSX element:
+
+```jsx
+<If when={() => isLoggedIn.get()} fallback={<LoginForm />}>
+  <Dashboard />
+</If>
+```
+
+| Prop | Type | Reactive? | Description |
+|---|---|---|---|
+| `when` | `() => boolean \| Signal<boolean> \| boolean` | ✅ normalized like any other reactive prop | Same as `condition` above. |
+| `fallback` | `Node \| ComponentInstance` | ❌ always literal | Same as `elseChild` above. |
+| `tagName` | `string` | ❌ always literal | Same as `options.tagName` above. |
+
+`fallback`/`tagName` are internally declared as raw (non-reactive) props — passing a literal `Node` or string works as-is, no wrapping needed.
 
 ---
 
@@ -318,7 +335,25 @@ Show(
 
 ---
 
-### `Each(itemsAccessor, keyFn, renderFn, options?)`
+### `Toggle` (JSX wrapper around `Show`)
+
+A JSX-only wrapper around [`Show`](#showcondition-child) for CSS-based conditional visibility. Unlike `If`, the child **stays in the DOM** — no teardown, no lifecycle hooks on toggle.
+
+```jsx
+<Toggle when={() => showPanel.get()}>
+  <aside className="panel">Sidebar content</aside>
+</Toggle>
+```
+
+| Prop | Type | Reactive? | Description |
+|---|---|---|---|
+| `when` | `() => boolean \| Signal<boolean> \| boolean` | ✅ normalized like any other reactive prop | Same as `condition` in `Show`. |
+
+`children` should be a single element (or an array whose first element is used).
+
+---
+
+### `For(itemsAccessor, keyFn, renderFn, options?)`
 
 Efficiently renders a keyed list. Each item gets its own reactive signal. When the array changes:
 
@@ -337,7 +372,7 @@ Efficiently renders a keyed list. Each item gets its own reactive signal. When t
 
 Returns the wrapper element (default `<span>`, configurable via `options.tagName`). Only the default/fallback `<span>` gets `display:contents` — an explicitly chosen `tagName` keeps its normal display, since it's assumed to already be a valid element for its context.
 
-> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `Each` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
+> **Known limitation:** no `tagName` value makes the wrapper valid inside `<ul>`, `<ol>`, or `<select>` — those elements only accept their specific item tag (`<li>`/`<option>`) as *direct* children. Avoid `For` directly inside those elements until a future anchor-based (no-wrapper) implementation lands.
 
 ```js
 const todos = createSignal([
@@ -345,12 +380,36 @@ const todos = createSignal([
   { id: 2, text: 'Walk the dog' },
 ]);
 
-Each(
+For(
   () => todos.get(),
   (item) => item.id,
   (item) => createElement('li', {}, [() => item.get().text]),
 );
 ```
+
+**JSX usage** — `For` also accepts a props object + a render-function child, so it can be used directly as a JSX element:
+
+```jsx
+<For each={() => todos.get()} keyFn={(item) => item.id}>
+  {(itemSignal) => <li>{() => itemSignal.get().text}</li>}
+</For>
+```
+
+> **Why `keyFn` and not `key`?** `key` is a reserved JSX attribute — every JSX
+> transform (Babel, esbuild, SWC, TypeScript) strips a literal `key={...}`
+> attribute out of `props` before the component ever runs, using it instead
+> for its own (unrelated) reconciliation bookkeeping. A component can never
+> actually receive a prop named `key` via JSX syntax, so `For` uses `keyFn`
+> for its item-keying function instead.
+
+| Prop | Type | Reactive? | Description |
+|---|---|---|---|
+| `each` | `() => Item[] \| Signal<Item[]> \| Item[]` | ✅ normalized like any other reactive prop | Same as `itemsAccessor` above. |
+| `keyFn` | `(item, index) => string \| number` | ❌ always literal, **required** | Same as `keyFn` above. |
+| `equals` | `(prev: Item, next: Item) => boolean` | ❌ always literal | Same as `options.equals` above. |
+| `tagName` | `string` | ❌ always literal | Same as `options.tagName` above. |
+
+`keyFn`/`equals`/`tagName` are internally declared as raw (non-reactive) props — they're passed exactly as given, since wrapping a multi-argument callback like `keyFn` in `computed()` would break its contract (it would be invoked with zero arguments).
 
 **Custom `equals` for contenteditable / DOM-ahead-of-model UIs** — the default
 `deepEqual` skips notifying an item's subscribers when a replacement item is
@@ -363,7 +422,7 @@ a reference-identity `equals` and always assign a **new object reference** at
 changed indices to force the update through:
 
 ```js
-Each(
+For(
   () => content.get(),
   (item) => item.id,
   (itemSignal) =>
@@ -605,7 +664,7 @@ const instance = getNodeComponent(someElement);
 
 ### `renderChild(parent, child)`
 
-Appends a single child value of any supported type to a DOM `parent`. This is the shared primitive `createElement`, `If`, and `Each` all use to render children, exposed for authors building their own rendering helpers on top of `@esmj/dom`.
+Appends a single child value of any supported type to a DOM `parent`. This is the shared primitive `createElement`, `If`, and `For` all use to render children, exposed for authors building their own rendering helpers on top of `@esmj/dom`.
 
 Supported `child` values: `null`/`undefined`/`boolean` (skipped), a DOM `Node`, a `string`/`number` (text node), a reactive `() => value` function, a signal-like value, a component instance, or an array of any of the above (rendered recursively).
 
@@ -642,7 +701,7 @@ function useDeferredContext(ctx) {
 
 ### `deepEqual(a, b)`
 
-Deep equality via `JSON.stringify`. Used internally by `Each` to skip re-renders when an item's content hasn't changed.
+Deep equality via `JSON.stringify`. Used internally by `For` to skip re-renders when an item's content hasn't changed.
 
 ```js
 deepEqual({ x: 1 }, { x: 1 }); // true
@@ -685,11 +744,11 @@ mount('#app', createElement(Counter, {}));
 
 ---
 
-### Reactive list with Each
+### Reactive list with For
 
 ```js
 import { createSignal } from '@esmj/signals';
-import { createElement, Each, mount } from '@esmj/dom';
+import { createElement, For, mount } from '@esmj/dom';
 
 function TodoApp() {
   const items = createSignal([
@@ -711,7 +770,7 @@ function TodoApp() {
   return createElement('div', {}, [
     createElement('button', { onClick: addItem }, ['Add todo']),
     createElement('ul', {}, [
-      Each(
+      For(
         () => items.get(),
         (item) => item.id,
         (item) =>

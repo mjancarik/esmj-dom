@@ -26,7 +26,7 @@ function jsxToElement(type, props) {
  * @param {string | Function | typeof Fragment} type
  * @param {Record<string, *>} props
  * @param {string | number | undefined} _key  Development/reconciliation key
- *   from the JSX transform. `@esmj/dom`'s own `Each()` primitive handles
+ *   from the JSX transform. `@esmj/dom`'s own `For()` primitive handles
  *   keyed list reconciliation explicitly, so this is accepted but ignored.
  */
 export function jsx(type, props, _key) {

@@ -5,7 +5,7 @@ export {
   isSignalLike,
   renderChild,
 } from './createElement.mjs';
-export { Each } from './Each.mjs';
+export { For } from './For.mjs';
 export { If } from './If.mjs';
 export { afterRender, onEffect, onMount, onUnmount } from './lifecycle.mjs';
 export { mount, unmount } from './mount.mjs';
@@ -22,3 +22,4 @@ export {
   withContext,
 } from './runtime.mjs';
 export { Show } from './Show.mjs';
+export { Toggle } from './Toggle.mjs';

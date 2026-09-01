@@ -2,21 +2,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { createElement, Fragment, renderChild } from '../createElement.mjs';
-import { Each } from '../Each.mjs';
+import { For } from '../For.mjs';
 import { onUnmount } from '../lifecycle.mjs';
+import { mount } from '../mount.mjs';
 
 // ---------------------------------------------------------------------------
 // Initial render
 // ---------------------------------------------------------------------------
 
-describe('Each — initial render', () => {
-  it('renders items into a span[data-each] container', async () => {
+describe('For — initial render', () => {
+  it('renders items into a span[data-for] container', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
       { id: 2, text: 'b' },
     ]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -28,7 +29,7 @@ describe('Each — initial render', () => {
     await afterFlush();
 
     assert.equal(container.tagName, 'SPAN');
-    assert.ok(container.hasAttribute('data-each'));
+    assert.ok(container.hasAttribute('data-for'));
     assert.equal(container.children.length, 2);
     assert.equal(container.children[0].textContent, 'a');
     assert.equal(container.children[1].textContent, 'b');
@@ -36,7 +37,7 @@ describe('Each — initial render', () => {
 
   it('renders an empty list with no children', async () => {
     const items = createSignal([]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       () => document.createElement('li'),
@@ -51,10 +52,10 @@ describe('Each — initial render', () => {
 // Adding items
 // ---------------------------------------------------------------------------
 
-describe('Each — adding items', () => {
+describe('For — adding items', () => {
   it('appends a new DOM child for a new key', async () => {
     const items = createSignal([{ id: 1, text: 'a' }]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -81,13 +82,13 @@ describe('Each — adding items', () => {
 // Removing items
 // ---------------------------------------------------------------------------
 
-describe('Each — removing items', () => {
+describe('For — removing items', () => {
   it('removes DOM child when key disappears', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
       { id: 2, text: 'b' },
     ]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -110,7 +111,7 @@ describe('Each — removing items', () => {
     let _unmounted = false;
 
     const items = createSignal([{ id: 1 }]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       () => {
@@ -137,12 +138,12 @@ describe('Each — removing items', () => {
 // Updating existing items (same key)
 // ---------------------------------------------------------------------------
 
-describe('Each — updating items in-place', () => {
+describe('For — updating items in-place', () => {
   it('updates the item signal without remounting', async () => {
     let renderCount = 0;
     const items = createSignal([{ id: 1, text: 'first' }]);
 
-    const _container = Each(
+    const _container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -171,7 +172,7 @@ describe('Each — updating items in-place', () => {
   it('reactive text inside renderFn updates when item signal changes', async () => {
     const items = createSignal([{ id: 1, text: 'first' }]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -194,12 +195,12 @@ describe('Each — updating items in-place', () => {
 // options.equals
 // ---------------------------------------------------------------------------
 
-describe('Each — options.equals', () => {
+describe('For — options.equals', () => {
   it('default deepEqual skips reactive update for structurally identical replacement item', async () => {
     let runCount = 0;
     const items = createSignal([{ id: 1, text: 'same' }]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -227,7 +228,7 @@ describe('Each — options.equals', () => {
     let runCount = 0;
     const items = createSignal([{ id: 1, text: 'same' }]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -257,7 +258,7 @@ describe('Each — options.equals', () => {
     const sharedItem = { id: 1, text: 'same' };
     const items = createSignal([sharedItem]);
 
-    Each(
+    For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -289,7 +290,7 @@ describe('Each — options.equals', () => {
 // Reordering items
 // ---------------------------------------------------------------------------
 
-describe('Each — reordering', () => {
+describe('For — reordering', () => {
   it('reorders DOM children to match new array order', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
@@ -297,7 +298,7 @@ describe('Each — reordering', () => {
       { id: 3, text: 'c' },
     ]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -321,7 +322,7 @@ describe('Each — reordering', () => {
   });
 });
 
-describe('Each — defensive key handling', () => {
+describe('For — defensive key handling', () => {
   it('logs and skips later duplicate keys without throwing', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
@@ -335,7 +336,7 @@ describe('Each — defensive key handling', () => {
     };
 
     try {
-      const container = Each(
+      const container = For(
         () => items.get(),
         (item) => item.id,
         (itemSig) => {
@@ -350,7 +351,7 @@ describe('Each — defensive key handling', () => {
       assert.equal(container.children.length, 1);
       assert.equal(container.children[0].textContent, 'a');
       assert.equal(errors.length, 1);
-      assert.match(errors[0], /Each: duplicate key "1" detected/);
+      assert.match(errors[0], /For: duplicate key "1" detected/);
     } finally {
       console.error = originalConsoleError;
     }
@@ -363,7 +364,7 @@ describe('Each — defensive key handling', () => {
 // children tracked/reordered/removed as one group)
 // ---------------------------------------------------------------------------
 
-describe('Each — Fragment items', () => {
+describe('For — Fragment items', () => {
   it('renders each Fragment item as multiple sibling nodes, in order, interleaved with single-node items', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
@@ -371,7 +372,7 @@ describe('Each — Fragment items', () => {
       { id: 3, text: 'c' },
     ]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -407,7 +408,7 @@ describe('Each — Fragment items', () => {
       '../componentInstance.mjs'
     );
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -453,7 +454,7 @@ describe('Each — Fragment items', () => {
       { id: 3, text: 'c' },
     ]);
 
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -488,10 +489,10 @@ describe('Each — Fragment items', () => {
 // options.tagName — configurable wrapper element
 // ---------------------------------------------------------------------------
 
-describe('Each — options.tagName', () => {
+describe('For — options.tagName', () => {
   it('defaults to a <span> wrapper', async () => {
     const items = createSignal([{ id: 1, text: 'a' }]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -505,12 +506,12 @@ describe('Each — options.tagName', () => {
     assert.equal(container.tagName, 'SPAN');
   });
 
-  it('uses the given tagName for the wrapper, keeping data-each without forcing display:contents', async () => {
+  it('uses the given tagName for the wrapper, keeping data-for without forcing display:contents', async () => {
     const items = createSignal([
       { id: 1, text: 'a' },
       { id: 2, text: 'b' },
     ]);
-    const container = Each(
+    const container = For(
       () => items.get(),
       (item) => item.id,
       (itemSig) => {
@@ -523,7 +524,7 @@ describe('Each — options.tagName', () => {
     await afterFlush();
 
     assert.equal(container.tagName, 'TBODY');
-    assert.ok(container.hasAttribute('data-each'));
+    assert.ok(container.hasAttribute('data-for'));
     assert.equal(container.style.display, '');
     assert.equal(container.children.length, 2);
   });
@@ -537,7 +538,7 @@ describe('Each — options.tagName', () => {
 
     try {
       const items = createSignal([{ id: 1, text: 'a' }]);
-      const container = Each(
+      const container = For(
         () => items.get(),
         (item) => item.id,
         (itemSig) => {
@@ -563,7 +564,7 @@ describe('Each — options.tagName', () => {
 
     try {
       const items = createSignal([{ id: 1, text: 'a' }]);
-      const container = Each(
+      const container = For(
         () => items.get(),
         (item) => item.id,
         (itemSig) => {
@@ -579,5 +580,133 @@ describe('Each — options.tagName', () => {
     } finally {
       console.warn = originalConsoleWarn;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// For — JSX props mode
+// ---------------------------------------------------------------------------
+
+describe('For — JSX props mode', () => {
+  it('renders items when called with a props object + children', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+
+    const container = For(
+      { each: () => items.get(), keyFn: (item) => item.id },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.tagName, 'SPAN');
+    assert.ok(container.hasAttribute('data-for'));
+    assert.equal(container.children.length, 2);
+    assert.equal(container.children[0].textContent, 'a');
+    assert.equal(container.children[1].textContent, 'b');
+  });
+
+  it('accepts children as an array (JSX auto-runtime shape)', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    const renderFn = (itemSig) => {
+      const el = document.createElement('li');
+      el.textContent = itemSig.get().text;
+      return el;
+    };
+
+    const container = For(
+      { each: () => items.get(), keyFn: (item) => item.id },
+      [renderFn],
+    );
+    await afterFlush();
+
+    assert.equal(container.children.length, 1);
+    assert.equal(container.children[0].textContent, 'a');
+  });
+
+  it('accepts "each" as a signal directly (not just a function accessor)', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+
+    const container = For(
+      { each: items, keyFn: (item) => item.id },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.children.length, 1);
+
+    items.set([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    await afterFlush();
+
+    assert.equal(container.children.length, 2);
+  });
+
+  it('throws when "keyFn" prop is missing', () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+
+    assert.throws(() => {
+      For({ each: () => items.get() }, (_itemSig) => {
+        return document.createElement('li');
+      });
+    }, /"keyFn" prop is required/);
+  });
+
+  it('honors "equals" and "tagName" props', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+
+    const container = For(
+      {
+        each: () => items.get(),
+        keyFn: (item) => item.id,
+        equals: (a, b) => a === b,
+        tagName: 'tbody',
+      },
+      (itemSig) => {
+        const el = document.createElement('tr');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.tagName, 'TBODY');
+    assert.equal(container.style.display, '');
+    assert.equal(container.children.length, 1);
+  });
+
+  it('works end-to-end through createElement + mount (JSX-style usage)', async () => {
+    const items = createSignal([
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]);
+    const root = document.createElement('div');
+
+    const el = createElement(
+      For,
+      { each: () => items.get(), keyFn: (item) => item.id },
+      (itemSig) => {
+        const li = document.createElement('li');
+        li.textContent = itemSig.get().text;
+        return li;
+      },
+    );
+    mount(root, el);
+    await afterFlush();
+
+    const container = root.firstChild;
+    assert.equal(container.tagName, 'SPAN');
+    assert.equal(container.children.length, 2);
   });
 });

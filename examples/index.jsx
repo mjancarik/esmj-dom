@@ -13,8 +13,10 @@
 //    lowercase tags (<div>, <yyy>) are treated as intrinsic HTML elements by
 //    JSX, not as references to a variable. (The old lowercase `xxx`/`yyy`
 //    demo functions were renamed to `Xxx`/`Yyy` for this reason.)
-//  - If()/Each()/Show() are plain function calls, not JSX components —
-//    embed their result as {expr} inside JSX children.
+//  - <If>/<For>/<Toggle> can be used as JSX elements directly (props +
+//    children), in addition to their low-level function-call form
+//    (If(condition, then, else), For(itemsAccessor, keyFn, renderFn),
+//    Show(condition, child)) — both styles are fully supported.
 //  - <>...</> (Fragment) groups children with no wrapping DOM element; the
 //    JSX transform auto-imports `Fragment` from the jsx-runtime, so no
 //    explicit import is needed for the shorthand syntax.
@@ -23,7 +25,15 @@
 import { createSignal } from '@esmj/signals';
 import uid from 'easy-uid';
 
-import { Component, Each, If, mount, onMount } from '../src/index.mjs';
+import {
+  Component,
+  For,
+  If,
+  mount,
+  onMount,
+  Toggle,
+  useRef,
+} from '../src/index.mjs';
 
 // ---------------------------------------------------------------------------
 // Example 1: Xxx / Yyy — basic counter with If and component lifecycle
@@ -52,16 +62,23 @@ function Yyy({ counter }) {
 
 function Xxx() {
   const state = createSignal(0);
+  // For/If forward unrecognized props straight to their reconciliation
+  // wrapper element, exactly like a plain DOM element — useRef + className
+  // work here the same way they'd work on a <div>.
+  const ifRef = useRef((el) => console.log('If wrapper element:', el));
 
   return (
     <div data-testid="xxx">
       <p onClick={() => state.set(state.get() + 1)}>
         {() => `Count: ${state.get()}`}
-        {If(
-          () => state.get() % 2 === 0,
-          <p>TextNode</p>, // borrowed Node
-          <Yyy counter={state} />, // component instance
-        )}
+        <If
+          when={() => state.get() % 2 === 0}
+          fallback={<Yyy counter={state} />} // component instance
+          className="if-wrapper"
+          $ref={ifRef}
+        >
+          <p>TextNode</p> {/* borrowed Node */}
+        </If>
       </p>
     </div>
   );
@@ -95,7 +112,7 @@ class Item extends Component {
   }
 
   onMount() {
-    console.log('Item mounted:', this.state.text);
+    console.log('Item mounted:', this.state.text.get());
   }
 
   render() {
@@ -114,6 +131,7 @@ function TodoList() {
     { id: 2, text: 'Build template engine' },
   ]);
   const newText = createSignal('');
+  const forRef = useRef((el) => console.log('For wrapper element:', el));
 
   onMount(() => {
     console.log('TodoList mounted');
@@ -139,25 +157,27 @@ function TodoList() {
         />
         <button onClick={addItem}>Add</button>
       </div>
-      <ul>
-        {Each(
-          () => items.get(),
-          (item) => item.id,
-          // item is a read-only signal: call item.get() to read the current value
-          (item) => (
-            <Item text={item.get().text}>
-              <button
-                onClick={() =>
-                  items.set(items.get().filter((i) => i.id !== item.get().id))
-                }
-                style="margin-left: 8px"
-              >
-                ×
-              </button>
-            </Item>
-          ),
+      {/* item is a read-only signal: call item.get() to read the current value */}
+      <For
+        each={() => items.get()}
+        keyFn={(item) => item.id}
+        tagName="ul"
+        className="todo-items"
+        $ref={forRef}
+      >
+        {(item) => (
+          <Item text={item.get().text}>
+            <button
+              onClick={() =>
+                items.set(items.get().filter((i) => i.id !== item.get().id))
+              }
+              style="margin-left: 8px"
+            >
+              ×
+            </button>
+          </Item>
         )}
-      </ul>
+      </For>
     </div>
   );
 }
@@ -181,9 +201,28 @@ function FragmentDemo() {
   );
 }
 
+// Toggle keeps its child in the DOM and only toggles CSS display — unlike
+// If, no teardown/remount happens on show/hide.
+function ToggleDemo() {
+  const showDetails = createSignal(true);
+
+  return (
+    <div data-testid="toggle-demo">
+      <h2>Toggle Demo</h2>
+      <button onClick={() => showDetails.set(!showDetails.get())}>
+        {() => (showDetails.get() ? 'Hide details' : 'Show details')}
+      </button>
+      <Toggle when={() => showDetails.get()}>
+        <p>These details stay mounted — only `display` toggles.</p>
+      </Toggle>
+    </div>
+  );
+}
+
 function App() {
   const count = createSignal(0);
   const name = createSignal('World');
+  const parityRef = useRef((el) => console.log('App If wrapper element:', el));
 
   return (
     <div data-testid="app">
@@ -198,11 +237,14 @@ function App() {
         onInput={(e) => name.set(e.target.value)}
       />
       <hr />
-      {If(
-        () => count.get() % 2 === 0,
-        <p style={{ color: 'green' }}>Count is even</p>,
-        <OddCounter counter={count} />,
-      )}
+      <If
+        when={() => count.get() % 2 === 0}
+        fallback={<OddCounter counter={count} />}
+        className="parity-display"
+        $ref={parityRef}
+      >
+        <p style={{ color: 'green' }}>Count is even</p>
+      </If>
       <hr />
       <TodoList />
       <ChildrenDemo>
@@ -210,6 +252,8 @@ function App() {
       </ChildrenDemo>
       <hr />
       <FragmentDemo />
+      <hr />
+      <ToggleDemo />
     </div>
   );
 }

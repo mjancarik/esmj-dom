@@ -84,7 +84,7 @@ export function afterRender(callback) {
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers (exported so component.mjs / If.mjs / Each.mjs can use them)
+// Internal helpers (exported so component.mjs / If.mjs / For.mjs can use them)
 // ---------------------------------------------------------------------------
 
 export function addDisposer(componentId, dispose) {

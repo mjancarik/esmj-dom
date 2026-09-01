@@ -1,11 +1,39 @@
 // ---------------------------------------------------------------------------
 // If.mjs — conditional rendering primitive
 //
-// API (v2 style): If(condition, thenChild, elseChild, options?)
+// Two calling conventions (dual-mode dispatcher, see `If` at the bottom):
+//
+// 1) Low-level:  If(condition, thenChild, elseChild, options?)
 //   - condition:  () => boolean
 //   - thenChild:  pre-built Node OR component instance descriptor
 //   - elseChild:  pre-built Node OR component instance descriptor (optional)
 //   - options.tagName: string — wrapper element tag, default 'span'
+//
+// 2) JSX props:  <If when={cond} fallback={elseNode} tagName="tbody">
+//                  {thenNode}
+//                </If>
+//   - props.when:      () => boolean | Signal<boolean> | boolean —
+//                      normalized like a regular reactive prop when routed
+//                      through JSX/createElement, then coerced via
+//                      `toAccessor` (see runtime.mjs).
+//   - props.fallback:  same role as `elseChild` above (optional). Declared
+//                      as a RAW_PROPS key so a literal Node/Fragment/
+//                      component instance is never signal-wrapped.
+//   - props.tagName:   same as options.tagName above; also a RAW_PROPS key
+//                      (a literal string, not a reactive value).
+//   - any other prop (class, $ref, style, onClick, data-*, …): forwarded to
+//                      the wrapper element via `applyProps` — same behavior
+//                      as a regular DOM element's props (static values,
+//                      plain functions, and signals are all supported).
+//   - props.children (or, for direct calls bypassing componentInstance, the
+//                      2nd positional argument): thenChild, or an array
+//                      whose first element is thenChild. `If` is called
+//                      exactly like any other function component via
+//                      componentInstance — `fn(props)`, one argument, with
+//                      `children` merged in as `props.children`.
+//   `If` declares `RAW_PROPS = (key) => key !== 'when'`, so every prop
+//   except `when` bypasses normalizeProps, while `when` keeps normal
+//   reactive normalization.
 //
 // Ownership model (fixes the v2 clearContainer bug):
 //   - Pre-built Node (passed in directly): BORROWED — only detach on branch
@@ -29,9 +57,19 @@
 
 import { computed, effect, untrack } from '@esmj/signals';
 import { isComponentInstance } from './componentInstance.mjs';
-import { removeRenderedNodes, resolveRenderedNodes } from './createElement.mjs';
+import {
+  applyProps,
+  removeRenderedNodes,
+  resolveRenderedNodes,
+} from './createElement.mjs';
 import { runMountHooks } from './lifecycle.mjs';
-import { addDisposer, createReconciliationContainer } from './runtime.mjs';
+import {
+  addDisposer,
+  createReconciliationContainer,
+  RAW_PROPS,
+  resolveChild,
+  toAccessor,
+} from './runtime.mjs';
 
 /**
  * Conditional rendering primitive — renders one of two branches based on a
@@ -50,23 +88,30 @@ import { addDisposer, createReconciliationContainer } from './runtime.mjs';
  *   signal change it depends on.
  * @param {T} thenChild  Branch rendered when `condition` is truthy.
  * @param {T} [elseChild]  Branch rendered when `condition` is falsy (optional).
- * @param {{ tagName?: string }} [options]  Optional settings. `tagName` sets
- *   the wrapper element's tag (default `'span'`) — use this when the default
- *   `<span>` would violate the parent's content model (e.g. `{ tagName:
- *   'tbody' }` inside a `<table>`). Note: no tag choice fixes `<ul>`/`<ol>`/
- *   `<select>` parents, which only accept their specific item tag as a
- *   direct child regardless of wrapper tag — see README.
+ * @param {{ tagName?: string, [key: string]: * }} [options]  Optional settings.
+ *   `tagName` sets the wrapper element's tag (default `'span'`) — use this
+ *   when the default `<span>` would violate the parent's content model
+ *   (e.g. `{ tagName: 'tbody' }` inside a `<table>`). Note: no tag choice
+ *   fixes `<ul>`/`<ol>`/`<select>` parents, which only accept their specific
+ *   item tag as a direct child regardless of wrapper tag — see README. Any
+ *   other key (`class`, `$ref`, `style`, `onClick`, `data-*`, …) is applied
+ *   to the wrapper element via the same `applyProps` logic used for
+ *   regular DOM elements — static values, functions, and signals are all
+ *   supported.
  * @returns {HTMLElement}  The wrapper element. Only the default/fallback
  *   `<span>` gets `display:contents` (to stay transparent to CSS layout); an
  *   explicitly chosen `tagName` keeps its normal display since it's assumed
  *   to already be valid for its context (e.g. `'tbody'` in a `<table>`).
  */
-export function If(condition, thenChild, elseChild, options) {
-  const { tagName = 'span' } = options ?? {};
+function IfImpl(condition, thenChild, elseChild, options) {
+  const { tagName = 'span', ...containerProps } = options ?? {};
   // display:contents (applied only to the default <span>, see
   // createReconciliationContainer) makes the wrapper invisible to CSS
   // layout while its children participate in the parent's layout normally.
   const container = createReconciliationContainer(tagName, 'data-if');
+
+  if (containerProps.id) container.setAttribute('id', containerProps.id);
+  applyProps(container, containerProps);
 
   // Borrowed branches (anything that is not a component instance — a plain
   // Node, a pre-built Fragment, or a primitive) are resolved to their live
@@ -143,3 +188,69 @@ export function If(condition, thenChild, elseChild, options) {
 
   return container;
 }
+
+/**
+ * Conditional rendering primitive — dual-mode dispatcher.
+ *
+ * Supports two calling conventions:
+ *
+ * 1) **Low-level** (unchanged, backward compatible):
+ *    `If(condition, thenChild, elseChild, options?)` — see `IfImpl` above
+ *    for full parameter docs.
+ *
+ * 2) **JSX props**: `If(props)`, e.g.
+ *    ```jsx
+ *    <If when={() => isLoggedIn.get()} fallback={<LoginForm/>} tagName="tbody">
+ *      <Dashboard/>
+ *    </If>
+ *    ```
+ *    Called through componentInstance exactly like any other function
+ *    component — a single `props` argument, with `children` merged in as
+ *    `props.children` (never signal-wrapped, same as any other component).
+ *
+ *    - `props.when` — `() => boolean`, a signal (`{ get() }`), or a static
+ *      boolean; coerced via `toAccessor`.
+ *    - `props.fallback` — same role as `elseChild` above (optional).
+ *    - `props.tagName` — same as `options.tagName` above.
+ *    - Any other prop (`class`, `$ref`, `style`, `onClick`, `data-*`, …) is
+ *      forwarded to the wrapper element, exactly like a regular DOM
+ *      element's props — static values, functions, and signals all work.
+ *    - `props.children` — `thenChild`, or an array whose first element is
+ *      `thenChild`. A second positional argument is also accepted as a
+ *      fallback, for direct calls that bypass componentInstance (e.g.
+ *      `If({ when }, thenEl)`).
+ *
+ *    `If` declares `RAW_PROPS = (key) => key !== 'when'` (see
+ *    `runtime.mjs`) so every prop except `when` bypasses `normalizeProps` —
+ *    a literal Node/Fragment/component instance `fallback`, a literal
+ *    `tagName` string, and arbitrary wrapper props (`class`, `$ref`,
+ *    `onClick`, …) all reach `applyProps`/consumers in their original
+ *    shape. `when` is the only key normalized like a regular reactive prop
+ *    when routed through JSX.
+ *
+ * @param {Function | { when: *, fallback?: *, tagName?: string, children?: *, [key: string]: * }} conditionOrProps
+ * @param {*} [thenChildOrChildren]
+ * @param {*} [elseChild]
+ * @param {{ tagName?: string, [key: string]: * }} [options]
+ * @returns {HTMLElement}
+ */
+export function If(conditionOrProps, thenChildOrChildren, elseChild, options) {
+  if (typeof conditionOrProps === 'function') {
+    return IfImpl(conditionOrProps, thenChildOrChildren, elseChild, options);
+  }
+
+  const { when, fallback, tagName, children, ...containerProps } =
+    conditionOrProps ?? {};
+  const condition = toAccessor(when);
+  const resolvedThenChild = resolveChild(
+    conditionOrProps ?? {},
+    thenChildOrChildren,
+  );
+
+  return IfImpl(condition, resolvedThenChild, fallback, {
+    ...containerProps,
+    tagName,
+  });
+}
+
+If[RAW_PROPS] = (key) => key !== 'when';
