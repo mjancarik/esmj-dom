@@ -710,3 +710,102 @@ describe('For — JSX props mode', () => {
     assert.equal(container.children.length, 2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wrapper pass-through props — arbitrary DOM props on the wrapper element
+// ---------------------------------------------------------------------------
+
+describe('For — wrapper pass-through props', () => {
+  it('applies a static class to the wrapper element', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+
+    const container = For(
+      {
+        each: () => items.get(),
+        keyFn: (item) => item.id,
+        class: 'todo-items',
+      },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.className, 'todo-items');
+  });
+
+  it('invokes a $ref callback with the wrapper element', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    let capturedEl = null;
+
+    const container = For(
+      {
+        each: () => items.get(),
+        keyFn: (item) => item.id,
+        $ref: (el) => {
+          capturedEl = el;
+        },
+      },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(capturedEl, container);
+  });
+
+  it('binds an onClick handler on the wrapper element', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    let clicked = false;
+
+    const container = For(
+      {
+        each: () => items.get(),
+        keyFn: (item) => item.id,
+        onClick: () => {
+          clicked = true;
+        },
+      },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    container.dispatchEvent(new Event('click', { bubbles: true }));
+    assert.equal(clicked, true);
+  });
+
+  it('reactively updates a computed class on the wrapper element', async () => {
+    const items = createSignal([{ id: 1, text: 'a' }]);
+    const highlighted = createSignal(false);
+
+    const container = For(
+      {
+        each: () => items.get(),
+        keyFn: (item) => item.id,
+        class: () => (highlighted.get() ? 'highlighted' : 'plain'),
+      },
+      (itemSig) => {
+        const el = document.createElement('li');
+        el.textContent = itemSig.get().text;
+        return el;
+      },
+    );
+    await afterFlush();
+
+    assert.equal(container.className, 'plain');
+
+    highlighted.set(true);
+    await afterFlush();
+
+    assert.equal(container.className, 'highlighted');
+  });
+});

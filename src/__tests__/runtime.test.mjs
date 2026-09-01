@@ -114,6 +114,23 @@ describe('normalizeProps', () => {
     assert.ok(typeof result.key.get === 'function');
     assert.notEqual(result.key, keyFn);
   });
+
+  it('accepts a predicate function for rawKeys (e.g. For/If RAW_PROPS)', () => {
+    const isRaw = (key) => key !== 'each';
+    const eachFn = () => [1, 2, 3];
+    const result = normalizeProps(
+      { each: eachFn, class: 'foo', $ref: () => {} },
+      isRaw,
+    );
+
+    // "each" is excluded by the predicate — stays normalized (wrapped).
+    assert.ok(typeof result.each.get === 'function');
+    assert.notEqual(result.each, eachFn);
+
+    // Everything else passes the predicate — stays raw/unwrapped.
+    assert.equal(result.class, 'foo');
+    assert.equal(typeof result.$ref, 'function');
+  });
 });
 
 // ---------------------------------------------------------------------------

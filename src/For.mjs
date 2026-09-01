@@ -91,7 +91,7 @@ import {
 import { runMountHooks } from './lifecycle.mjs';
 import {
   addDisposer,
-  createReconciliationContainer,
+  createControlFlowContainer,
   deepEqual,
   getInternalContext,
   RAW_PROPS,
@@ -125,7 +125,9 @@ import {
  *
  * @template Item
  * @param {() => Item[]} itemsAccessor  Reactive accessor returning the current
- *   array of items.
+ *   array of items. A non-array return value (e.g. `undefined` from a
+ *   misconfigured `each` prop) is treated as an empty list rather than
+ *   throwing.
  * @param {(item: Item, index: number) => string|number} keyFn  Returns a
  *   stable unique key for each item. Must be unique within the list.
  * @param {(itemSignal: { get(): Item }, index: number) => Node} renderFn
@@ -152,9 +154,11 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
     tagName = 'span',
     ...containerProps
   } = options ?? {};
-  const container = createReconciliationContainer(tagName, 'data-for');
-
-  if (containerProps.id) container.setAttribute('id', containerProps.id);
+  const container = createControlFlowContainer(
+    tagName,
+    'data-for',
+    containerProps,
+  );
   applyProps(container, containerProps);
 
   // Capture the component context active when For() is constructed (i.e. the
@@ -174,7 +178,8 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
   const itemsComputed = computed(() => itemsAccessor());
 
   const dispose = effect(() => {
-    const items = itemsComputed.get();
+    const rawItems = itemsComputed.get();
+    const items = Array.isArray(rawItems) ? rawItems : [];
     const uniqueItems = [];
     const newKeys = [];
     const seenKeys = new Set();

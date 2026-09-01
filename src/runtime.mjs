@@ -174,6 +174,32 @@ export function createReconciliationContainer(tagName, dataAttrName) {
 }
 
 /**
+ * Create the reconciliation wrapper for a control-flow component (`For`,
+ * `If`) AND apply its `id` (if present) — the two steps that always precede
+ * an `applyProps(container, containerProps)` call in both `ForImpl` and
+ * `IfImpl`. Kept separate from `applyProps` itself (not called here) to
+ * avoid a circular import between `runtime.mjs` and `createElement.mjs`;
+ * callers must still call `applyProps(container, containerProps)`
+ * themselves right after this returns.
+ *
+ * @param {string} tagName  Same as `createReconciliationContainer`.
+ * @param {string} dataAttrName  Same as `createReconciliationContainer`.
+ * @param {Record<string, *>} containerProps  Remaining pass-through props;
+ *   only `id` is consulted here (applied via `setAttribute`, matching
+ *   `applyProps`'s convention of skipping `id` so callers control it).
+ * @returns {HTMLElement}
+ */
+export function createControlFlowContainer(
+  tagName,
+  dataAttrName,
+  containerProps,
+) {
+  const container = createReconciliationContainer(tagName, dataAttrName);
+  if (containerProps?.id) container.setAttribute('id', containerProps.id);
+  return container;
+}
+
+/**
  * Create a signal-shaped ref object.
  *
  * Use the object directly as `$ref` (it has `.current`), or pass `ref.set`

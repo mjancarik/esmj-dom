@@ -65,7 +65,7 @@ import {
 import { runMountHooks } from './lifecycle.mjs';
 import {
   addDisposer,
-  createReconciliationContainer,
+  createControlFlowContainer,
   RAW_PROPS,
   resolveChild,
   toAccessor,
@@ -107,9 +107,11 @@ function IfImpl(condition, thenChild, elseChild, options) {
   // display:contents (applied only to the default <span>, see
   // createReconciliationContainer) makes the wrapper invisible to CSS
   // layout while its children participate in the parent's layout normally.
-  const container = createReconciliationContainer(tagName, 'data-if');
-
-  if (containerProps.id) container.setAttribute('id', containerProps.id);
+  const container = createControlFlowContainer(
+    tagName,
+    'data-if',
+    containerProps,
+  );
   applyProps(container, containerProps);
 
   // Borrowed branches (anything that is not a component instance — a plain

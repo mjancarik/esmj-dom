@@ -149,7 +149,9 @@ function TodoList() {
     <div data-testid="todo-list">
       <h2>Todo List</h2>
       <div>
+        <label htmlFor="new-todo-input">New todo</label>
         <input
+          id="new-todo-input"
           type="text"
           placeholder="Add todo..."
           value={() => newText.get()}
@@ -171,6 +173,7 @@ function TodoList() {
               onClick={() =>
                 items.set(items.get().filter((i) => i.id !== item.get().id))
               }
+              aria-label={() => `Remove ${item.get().text}`}
               style="margin-left: 8px"
             >
               ×
@@ -231,7 +234,9 @@ function App() {
         {() => `Count: ${count.get()}`}
       </button>
       <br />
+      <label htmlFor="app-name-input">Name</label>
       <input
+        id="app-name-input"
         type="text"
         value="World"
         onInput={(e) => name.set(e.target.value)}

@@ -442,3 +442,83 @@ describe('If — JSX props mode', () => {
     assert.ok(container.contains(thenEl));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wrapper pass-through props — arbitrary DOM props on the wrapper element
+// ---------------------------------------------------------------------------
+
+describe('If — wrapper pass-through props', () => {
+  it('applies a static class to the wrapper element', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+
+    const container = If(
+      { when: () => cond.get(), class: 'if-wrapper' },
+      thenEl,
+    );
+    await afterFlush();
+
+    assert.equal(container.className, 'if-wrapper');
+  });
+
+  it('invokes a $ref callback with the wrapper element', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+    let capturedEl = null;
+
+    const container = If(
+      {
+        when: () => cond.get(),
+        $ref: (el) => {
+          capturedEl = el;
+        },
+      },
+      thenEl,
+    );
+    await afterFlush();
+
+    assert.equal(capturedEl, container);
+  });
+
+  it('binds an onClick handler on the wrapper element', async () => {
+    const cond = createSignal(true);
+    const thenEl = document.createElement('span');
+    let clicked = false;
+
+    const container = If(
+      {
+        when: () => cond.get(),
+        onClick: () => {
+          clicked = true;
+        },
+      },
+      thenEl,
+    );
+    await afterFlush();
+
+    container.dispatchEvent(new Event('click', { bubbles: true }));
+    assert.equal(clicked, true);
+  });
+
+  it('reactively updates a computed class on the wrapper element', async () => {
+    const cond = createSignal(true);
+    const active = createSignal(false);
+    const thenEl = document.createElement('span');
+
+    const container = If(
+      {
+        when: () => cond.get(),
+        class: () => (active.get() ? 'active' : 'inactive'),
+      },
+      thenEl,
+    );
+    await afterFlush();
+
+    assert.equal(container.className, 'inactive');
+
+    active.set(true);
+    await afterFlush();
+
+    assert.equal(container.className, 'active');
+  });
+});
