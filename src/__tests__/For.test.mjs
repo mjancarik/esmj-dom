@@ -284,6 +284,37 @@ describe('For — options.equals', () => {
       'reactive binding must not re-run for same reference',
     );
   });
+
+  it('default deepEqual treats nested [] -> {} as a change and updates the existing key in place', async () => {
+    let runCount = 0;
+    const items = createSignal([{ id: 1, payload: { kind: [] } }]);
+
+    const container = For(
+      () => items.get(),
+      (item) => item.id,
+      (itemSig) => {
+        const el = document.createElement('li');
+        renderChild(el, () => {
+          runCount++;
+          return Array.isArray(itemSig.get().payload.kind) ? 'array' : 'object';
+        });
+        return el;
+      },
+    );
+    await afterFlush();
+    assert.equal(runCount, 1);
+    assert.equal(container.children[0].textContent, 'array');
+
+    items.set([{ id: 1, payload: { kind: {} } }]);
+    await afterFlush();
+
+    assert.equal(
+      runCount,
+      2,
+      'existing-key item signal should notify subscribers',
+    );
+    assert.equal(container.children[0].textContent, 'object');
+  });
 });
 
 // ---------------------------------------------------------------------------

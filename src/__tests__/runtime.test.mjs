@@ -310,6 +310,38 @@ describe('deepEqual', () => {
     const second = JSON.parse('{"__proto__":{"nested":1},"value":2}');
     assert.ok(deepEqual(first, second));
   });
+
+  it('distinguishes arrays from plain objects (both argument orders)', () => {
+    assert.equal(deepEqual([], {}), false);
+    assert.equal(deepEqual({}, []), false);
+
+    assert.equal(deepEqual([1], { 0: 1 }), false);
+    assert.equal(deepEqual({ 0: 1 }, [1]), false);
+  });
+
+  it('compares array length in addition to enumerable keys', () => {
+    assert.equal(deepEqual(Array(1), Array(2)), false);
+    assert.equal(deepEqual(Array(2), Array(1)), false);
+  });
+
+  it('applies array/object distinction recursively for nested values', () => {
+    assert.equal(deepEqual({ nested: [] }, { nested: {} }), false);
+    assert.equal(deepEqual({ nested: {} }, { nested: [] }), false);
+
+    assert.equal(
+      deepEqual({ a: [{ kind: [] }] }, { a: [{ kind: {} }] }),
+      false,
+    );
+    assert.equal(
+      deepEqual({ a: [{ kind: {} }] }, { a: [{ kind: [] }] }),
+      false,
+    );
+  });
+
+  it('keeps equal arrays and key-order-independent objects compatible', () => {
+    assert.equal(deepEqual([1, { x: 2 }], [1, { x: 2 }]), true);
+    assert.equal(deepEqual({ a: 1, b: 2 }, { b: 2, a: 1 }), true);
+  });
 });
 
 // ---------------------------------------------------------------------------

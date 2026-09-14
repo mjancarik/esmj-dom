@@ -701,11 +701,20 @@ function useDeferredContext(ctx) {
 
 ### `deepEqual(a, b)`
 
-Deep equality via `JSON.stringify`. Used internally by `For` to skip re-renders when an item's content hasn't changed.
+Deep structural equality for primitives, arrays, and plain objects. Used
+internally by `For` to skip re-renders when an item's content hasn't changed.
+
+- Distinguishes arrays from non-arrays (`[]` is not equal to `{}`).
+- For arrays, compares `.length` first (so sparse arrays with different lengths
+  are not equal, even when enumerable keys match).
+- Recursively compares own enumerable string-keyed properties (including own
+  accessors), so object key order does not matter.
 
 ```js
 deepEqual({ x: 1 }, { x: 1 }); // true
 deepEqual({ x: 1 }, { x: 2 }); // false
+deepEqual([], {}); // false
+deepEqual(Array(1), Array(2)); // false
 ```
 
 ---

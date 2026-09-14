@@ -429,11 +429,11 @@ export function normalizeProps(props, rawKeys) {
 }
 
 /**
- * Structural equality check using JSON serialization.
+ * Structural equality check for primitives, plain objects, and arrays.
  *
- * Returns `true` if `a` and `b` are strictly equal (`===`) or serialize to
- * the same JSON string. Falls back to `false` for values that cannot be
- * serialized (e.g. circular references).
+ * Returns `true` for strict reference/primitive equality (`===`), and for
+ * objects/arrays whose own enumerable string-keyed properties recursively
+ * compare equal (including own accessor descriptors).
  *
  * Used as the `equals` option for item signals in `For` to avoid
  * unnecessary re-renders when an item's data hasn't actually changed.
@@ -446,6 +446,12 @@ export function deepEqual(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof a !== 'object' || typeof b !== 'object') return false;
+
+  const aIsArray = Array.isArray(a);
+  const bIsArray = Array.isArray(b);
+  if (aIsArray !== bIsArray) return false;
+  if (aIsArray && a.length !== b.length) return false;
+
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
