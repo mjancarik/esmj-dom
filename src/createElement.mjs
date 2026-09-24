@@ -140,8 +140,12 @@ export function createElement(nodeName, props, children) {
 /**
  * Set inner content from a string (via innerHTML) or a DocumentFragment
  * (via replaceChildren, which clears existing nodes before inserting).
+ * Existing descendants are fully torn down first so component lifecycle
+ * cleanup runs before the DOM nodes are detached.
  */
 function applyInnerContent(element, value) {
+  clearContainer(element);
+
   if (value instanceof DocumentFragment) {
     element.replaceChildren(value);
   } else {

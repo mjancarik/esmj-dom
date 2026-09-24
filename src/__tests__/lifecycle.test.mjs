@@ -243,6 +243,25 @@ describe('cleanupTree', () => {
     assert.ok(unmounted);
   });
 
+  it('cancels pending mount hooks for component root elements', () => {
+    const el = document.createElement('div');
+    const id = `ct-pending-mount-${Math.random()}`;
+    let mounted = false;
+    initNodeInternal(el);
+    setNodeComponent(el, { componentId: id });
+    mountHooksRegistry.set(id, [
+      () => {
+        mounted = true;
+      },
+    ]);
+
+    cleanupTree(el);
+    runMountHooks({ componentId: id });
+
+    assert.equal(mounted, false);
+    assert.ok(!mountHooksRegistry.has(id));
+  });
+
   it('recurses into child nodes', () => {
     const parent = document.createElement('div');
     const child = document.createElement('span');

@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { afterFlush, computed, createSignal } from '@esmj/signals';
+import { Component } from '../Component.mjs';
 import { createComponentInstance } from '../componentInstance.mjs';
 import { createElement, isSignalLike, renderChild } from '../createElement.mjs';
+import { afterRender } from '../lifecycle.mjs';
+import { mount, unmount } from '../mount.mjs';
 import { useRef } from '../runtime.mjs';
+
+function afterNextRender() {
+  return new Promise(afterRender);
+}
 
 // ---------------------------------------------------------------------------
 // isSignalLike
@@ -577,6 +584,169 @@ describe('createElement — $dangerouslySetInnerHTML', () => {
     await afterFlush();
 
     assert.equal(el.querySelector('span')?.textContent, 'second');
+  });
+
+  it('tears down old fragment-mounted components on repeated replacement', async (t) => {
+    const value = createSignal(0);
+    const mounted = [];
+    const removed = [];
+
+    class Probe extends Component {
+      onMount() {
+        mounted.push(this.props.value.peek());
+      }
+
+      onUnmount() {
+        removed.push(this.props.value.peek());
+      }
+
+      render() {
+        return createElement('span', {}, String(this.props.value.peek()));
+      }
+    }
+
+    class Host extends Component {
+      render() {
+        return createElement('div', {
+          $dangerouslySetInnerHTML: () => {
+            const fragment = document.createDocumentFragment();
+            mount(fragment, createElement(Probe, { value: value.get() }));
+            return fragment;
+          },
+        });
+      }
+    }
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    t.after(() => {
+      unmount(root);
+      root.remove();
+    });
+
+    mount(root, createElement(Host));
+    await afterNextRender();
+
+    value.set(1);
+    await afterNextRender();
+
+    value.set(2);
+    await afterNextRender();
+
+    assert.equal(root.textContent, '2');
+    assert.deepEqual(mounted, [0, 1, 2]);
+    assert.deepEqual(removed, [0, 1]);
+  });
+
+  it('tears down nested fragment descendants on fragment-to-empty transition exactly once', async (t) => {
+    const value = createSignal(0);
+    const removed = [];
+
+    class Probe extends Component {
+      onUnmount() {
+        removed.push(this.props.label.peek());
+      }
+
+      render() {
+        return createElement('span', {}, this.props.label.peek());
+      }
+    }
+
+    class Host extends Component {
+      render() {
+        return createElement('div', {
+          $dangerouslySetInnerHTML: () => {
+            const current = value.get();
+            if (current === 1) return '';
+
+            const fragment = document.createDocumentFragment();
+            const wrapper = createElement('section', {}, [
+              createElement(Probe, { label: `outer-${current}` }),
+              createElement('div', {}, [
+                createElement(Probe, { label: `inner-a-${current}` }),
+                createElement(Probe, { label: `inner-b-${current}` }),
+              ]),
+            ]);
+            mount(fragment, wrapper);
+            return fragment;
+          },
+        });
+      }
+    }
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    t.after(() => {
+      unmount(root);
+      root.remove();
+    });
+
+    mount(root, createElement(Host));
+    await afterNextRender();
+
+    value.set(1);
+    await afterNextRender();
+
+    assert.equal(root.textContent, '');
+    assert.deepEqual(removed, ['outer-0', 'inner-a-0', 'inner-b-0']);
+
+    unmount(root);
+
+    assert.deepEqual(
+      removed,
+      ['outer-0', 'inner-a-0', 'inner-b-0'],
+      'removed descendants should not unmount twice during final parent teardown',
+    );
+  });
+
+  it('tears down fragment descendants on fragment-to-string replacement and remains reactive', async (t) => {
+    const value = createSignal(0);
+    const removed = [];
+
+    class Probe extends Component {
+      onUnmount() {
+        removed.push(this.props.value.peek());
+      }
+
+      render() {
+        return createElement('span', {}, String(this.props.value.peek()));
+      }
+    }
+
+    class Host extends Component {
+      render() {
+        return createElement('div', {
+          $dangerouslySetInnerHTML: () => {
+            const current = value.get();
+            if (current === 1) return '<strong>plain</strong>';
+
+            const fragment = document.createDocumentFragment();
+            mount(fragment, createElement(Probe, { value: current }));
+            return fragment;
+          },
+        });
+      }
+    }
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    t.after(() => {
+      unmount(root);
+      root.remove();
+    });
+
+    mount(root, createElement(Host));
+    await afterNextRender();
+
+    value.set(1);
+    await afterNextRender();
+    assert.equal(root.firstChild?.innerHTML, '<strong>plain</strong>');
+    assert.deepEqual(removed, [0]);
+
+    value.set(2);
+    await afterNextRender();
+    assert.equal(root.textContent, '2');
+    assert.deepEqual(removed, [0]);
   });
 });
 
