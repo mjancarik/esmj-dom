@@ -82,7 +82,7 @@ Children that are **functions** (`() => someSignal.get()`) are reactive text nod
 - `$ref: (el) => ...` — called with the real DOM element after it is created.
 - `on*` (e.g. `onClick`, `onInput`) — added as `addEventListener` listeners (`onSecurityPolicyViolation` is blocked).
 - `style` — accepts an object `{ color: 'red' }` or a string.
-- `$dangerouslySetInnerHTML` — accepts a string, `DocumentFragment`, signal, or function and replaces element content reactively.
+- `$dangerouslySetInnerHTML` — accepts a string, `DocumentFragment`, signal, or function and replaces element content reactively. When a reactive update replaces previously rendered owned descendants, their `onUnmount` hooks and registered disposers run before the old DOM is detached.
 - Security guardrails: `srcdoc` is blocked, and URL-like attributes (`href`, `src`, `action`, `formaction`, `xlink:href`) reject `javascript:` values.
 
 **Ownership model** — `If` and `For` accept two kinds of children:
@@ -163,6 +163,15 @@ createElement('div', {
   $dangerouslySetInnerHTML: html, // also accepts () => '<b>...</b>' or DocumentFragment
 });
 ```
+
+If a reactive `$dangerouslySetInnerHTML` update replaces DOM that was produced by
+mounted component instances, the removed descendants are torn down through the
+normal lifecycle path before replacement. That means:
+
+- `onUnmount` runs exactly once for removed owned descendants.
+- Component-scoped reactive disposers are cleaned up.
+- If a descendant is removed before its queued mount hook flushes, that pending
+  mount is cancelled and will not run later on detached DOM.
 
 ```js
 const count = createSignal(0);

@@ -154,6 +154,10 @@ export function cleanupTree(node) {
 
   const instance = getNodeComponent(node);
   if (instance) {
+    // A component can be detached before its queued mount microtask runs
+    // (e.g. fragment replacement in $dangerouslySetInnerHTML). Drop pending
+    // mount hooks so removed instances never mount after teardown.
+    mountHooksRegistry.delete(instance.componentId);
     runUnmountHooks(instance.componentId);
     disposeComponent(instance.componentId);
   }
