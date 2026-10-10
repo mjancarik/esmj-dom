@@ -429,11 +429,25 @@ export function normalizeProps(props, rawKeys) {
 }
 
 /**
+ * @param {object} value
+ * @returns {(string | symbol)[]}
+ */
+function enumerableOwnKeys(value) {
+  const keys = Object.keys(value);
+  const symbols = Object.getOwnPropertySymbols(value).filter((key) =>
+    Object.prototype.propertyIsEnumerable.call(value, key),
+  );
+  return symbols.length ? [...keys, ...symbols] : keys;
+}
+
+/**
  * Structural equality check for primitives, plain objects, and arrays.
  *
  * Returns `true` for strict reference/primitive equality (`===`), and for
- * objects/arrays whose own enumerable string-keyed properties recursively
- * compare equal (including own accessor descriptors).
+ * objects/arrays whose own enumerable string- and Symbol-keyed properties
+ * recursively compare equal (including own accessor descriptors). Symbol keys
+ * match by identity; inherited and non-enumerable properties are ignored.
+ * Same-reference mutations are not detected. Cyclic graphs are unsupported.
  *
  * Used as the `equals` option for item signals in `For` to avoid
  * unnecessary re-renders when an item's data hasn't actually changed.
@@ -452,13 +466,13 @@ export function deepEqual(a, b) {
   if (aIsArray !== bIsArray) return false;
   if (aIsArray && a.length !== b.length) return false;
 
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+  const keysA = enumerableOwnKeys(a);
+  const keysB = enumerableOwnKeys(b);
   if (keysA.length !== keysB.length) return false;
   return keysA.every((k) => {
     const descriptorA = Object.getOwnPropertyDescriptor(a, k);
     const descriptorB = Object.getOwnPropertyDescriptor(b, k);
-    if (!descriptorA || !descriptorB) return false;
+    if (!descriptorA?.enumerable || !descriptorB?.enumerable) return false;
 
     const valueA =
       'value' in descriptorA ? descriptorA.value : descriptorA.get?.call(a);

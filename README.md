@@ -716,14 +716,27 @@ internally by `For` to skip re-renders when an item's content hasn't changed.
 - Distinguishes arrays from non-arrays (`[]` is not equal to `{}`).
 - For arrays, compares `.length` first (so sparse arrays with different lengths
   are not equal, even when enumerable keys match).
-- Recursively compares own enumerable string-keyed properties (including own
-  accessors), so object key order does not matter.
+- Recursively compares own enumerable string- and Symbol-keyed properties
+  (including own accessors), so property insertion order does not matter.
+- Symbol keys match by identity, not description: repeated `Symbol.for()` calls
+  with the same registry key match, but distinct `Symbol('id')` keys do not.
+- Ignores inherited and non-enumerable properties.
+- Retains strict same-reference equality; in-place mutations are not detected.
+
+Enumerable Symbol-only differences intentionally compare unequal and can now
+notify reactive bindings in `For`, without remounting an unchanged outer key.
+Use immutable, acyclic plain data: cycle handling and specialized comparisons
+for DOM nodes, Maps, Sets, Dates, or prototypes are not provided. Own enumerable
+getters are evaluated with their owning object as receiver, including Symbol
+getters, and may have side effects or throw.
 
 ```js
 deepEqual({ x: 1 }, { x: 1 }); // true
 deepEqual({ x: 1 }, { x: 2 }); // false
 deepEqual([], {}); // false
 deepEqual(Array(1), Array(2)); // false
+const id = Symbol.for('componentId');
+deepEqual({ [id]: 'first' }, { [id]: 'second' }); // false
 ```
 
 ---

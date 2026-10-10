@@ -41,7 +41,14 @@
     "commit": "node_modules/.bin/git-cz",
     "changelog": "node_modules/.bin/conventional-changelog -p angular -i CHANGELOG.md -s -r 1",
     "build": "node_modules/.bin/tsup --dts && cp src/jsx-runtime.d.ts dist/jsx-runtime.d.ts",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "agent:verify": "npm run agent:test && npm run agent:lint && npm run agent:build && npm run agent:build:examples",
+    "agent:test": "node --test --experimental-strip-types --import ./src/__tests__/setup.mjs 'src/__tests__/**/*.test.mjs'",
+    "agent:test:file": "node --test --experimental-strip-types --import ./src/__tests__/setup.mjs",
+    "agent:lint": "biome check --no-errors-on-unmatched",
+    "agent:format": "biome check --no-errors-on-unmatched --write",
+    "agent:build": "npm run build",
+    "agent:build:examples": "vite build examples"
   },
   "repository": {
     "type": "git",

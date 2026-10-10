@@ -6,6 +6,11 @@ export default [
     clean: true,
     minify: true,
     target: 'es2022',
+    // Only opt-in private fields may be renamed. Public component descriptors,
+    // user props, signal methods, and DOM APIs must retain their property names.
+    esbuildOptions(options) {
+      options.mangleProps = /^_[a-zA-Z]/;
+    },
     format: ['esm', 'cjs'],
     treeshake: true,
     shims: false,

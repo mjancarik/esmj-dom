@@ -3,8 +3,8 @@ import { describe, it } from 'node:test';
 import { afterFlush, createSignal } from '@esmj/signals';
 import { createElement, Fragment, renderChild } from '../createElement.mjs';
 import { For } from '../For.mjs';
-import { onUnmount } from '../lifecycle.mjs';
-import { mount } from '../mount.mjs';
+import { onMount, onUnmount } from '../lifecycle.mjs';
+import { mount, unmount } from '../mount.mjs';
 
 // ---------------------------------------------------------------------------
 // Initial render
@@ -196,6 +196,74 @@ describe('For — updating items in-place', () => {
 // ---------------------------------------------------------------------------
 
 describe('For — options.equals', () => {
+  it('updates mounted nested Symbol IDs without remounting the unchanged outer key', async () => {
+    const COMPONENT_ID = Symbol.for('mrakomor.componentId');
+    const makeItem = (id) => ({
+      id: 'outer',
+      properties: { items: [{ text: 'Row', [COMPONENT_ID]: id }] },
+    });
+    const items = createSignal([makeItem('first')]);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let renderCount = 0;
+    let mountCount = 0;
+    let unmountCount = 0;
+    let bindingCount = 0;
+
+    function Row({ item }) {
+      renderCount++;
+      onMount(() => {
+        mountCount++;
+      });
+      onUnmount(() => {
+        unmountCount++;
+      });
+      return createElement('div', {}, () => {
+        bindingCount++;
+        return item.get().properties.items[0][COMPONENT_ID];
+      });
+    }
+
+    function App() {
+      return For(
+        () => items.get(),
+        (item) => item.id,
+        (item) => createElement(Row, { item }),
+      );
+    }
+
+    try {
+      mount(host, createElement(App));
+      await afterFlush();
+      const row = host.querySelector('[data-for]').firstElementChild;
+      assert.equal(row.textContent, 'first');
+      assert.equal(renderCount, 1);
+      assert.equal(mountCount, 1);
+      const initialBindingCount = bindingCount;
+
+      for (const id of ['second', 'third']) {
+        items.set([makeItem(id)]);
+        await afterFlush();
+        assert.equal(row.textContent, id);
+        assert.equal(host.querySelector('[data-for]').firstElementChild, row);
+        assert.equal(renderCount, 1);
+        assert.equal(mountCount, 1);
+        assert.equal(unmountCount, 0);
+      }
+      assert.ok(bindingCount > initialBindingCount);
+      const changedBindingCount = bindingCount;
+      items.set([makeItem('third')]);
+      await afterFlush();
+      assert.equal(bindingCount, changedBindingCount);
+      assert.equal(host.querySelector('[data-for]').firstElementChild, row);
+      assert.equal(unmountCount, 0);
+    } finally {
+      unmount(host);
+      host.remove();
+    }
+    assert.equal(unmountCount, 1);
+  });
+
   it('default deepEqual skips reactive update for structurally identical replacement item', async () => {
     let runCount = 0;
     const items = createSignal([{ id: 1, text: 'same' }]);

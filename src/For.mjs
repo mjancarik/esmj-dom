@@ -167,7 +167,7 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
   // context is null, so we restore it manually around renderFn calls.
   const capturedContext = getInternalContext();
 
-  // currentEntries: Array<{ key, nodes: Node[] }>
+  // currentEntries: Array<{ _key, _nodes: Node[] }> (bundle-private fields)
   let currentEntries = [];
 
   // Per-key item signals. Kept alive as long as the key is in the list.
@@ -196,7 +196,7 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
       uniqueItems.push(item);
       newKeys.push(key);
     }
-    const oldMap = new Map(currentEntries.map((e) => [e.key, e]));
+    const oldMap = new Map(currentEntries.map((e) => [e._key, e]));
 
     const newEntries = [];
 
@@ -218,12 +218,12 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
         itemSignalMap.set(key, itemSignal);
 
         const readonlySignal = { ...itemSignal, set() {} };
-        const entry = { key, nodes: [] };
+        const entry = { _key: key, _nodes: [] };
 
         withContext(capturedContext, () => {
           const child = renderFn(readonlySignal, i);
           const { nodes, instance } = resolveRenderedNodes(child);
-          entry.nodes = nodes;
+          entry._nodes = nodes;
           if (instance) {
             queueMicrotask(() => runMountHooks(instance));
           }
@@ -238,7 +238,7 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
     // lifecycle (owned = true) — no need for redundant explicit
     // runUnmountHooks / disposeComponent calls.
     for (const [key, entry] of oldMap) {
-      removeRenderedNodes(entry.nodes);
+      removeRenderedNodes(entry._nodes);
       itemSignalMap.delete(key);
     }
 
@@ -248,7 +248,7 @@ function ForImpl(itemsAccessor, keyFn, renderFn, options) {
     // without relying on fixed child-index positions.
     let nextNode = null;
     for (let i = newEntries.length - 1; i >= 0; i--) {
-      const nodes = newEntries[i].nodes;
+      const nodes = newEntries[i]._nodes;
       for (let j = nodes.length - 1; j >= 0; j--) {
         const node = nodes[j];
         if (node.parentNode !== container || node.nextSibling !== nextNode) {

@@ -342,6 +342,156 @@ describe('deepEqual', () => {
     assert.equal(deepEqual([1, { x: 2 }], [1, { x: 2 }]), true);
     assert.equal(deepEqual({ a: 1, b: 2 }, { b: 2, a: 1 }), true);
   });
+
+  it('compares values under the same enumerable Symbol key', () => {
+    const key = Symbol('id');
+    assert.equal(deepEqual({ [key]: 'first' }, { [key]: 'first' }), true);
+    assert.equal(deepEqual({ [key]: 'first' }, { [key]: 'second' }), false);
+    assert.equal(deepEqual({ [key]: 'second' }, { [key]: 'first' }), false);
+  });
+
+  it('rejects missing or additional Symbol keys in both directions', () => {
+    const key = Symbol('id');
+    const first = { text: 'Row' };
+    const second = { text: 'Row', [key]: undefined };
+    assert.equal(deepEqual(first, second), false);
+    assert.equal(deepEqual(second, first), false);
+  });
+
+  it('matches Symbol keys by identity rather than description', () => {
+    const first = { [Symbol('id')]: 'same' };
+    const second = { [Symbol('id')]: 'same' };
+    assert.equal(deepEqual(first, second), false);
+    assert.equal(deepEqual(second, first), false);
+    assert.equal(
+      deepEqual({ [Symbol.for('id')]: 1 }, { [Symbol.for('id')]: 1 }),
+      true,
+    );
+  });
+
+  it('ignores insertion order for mixed string and Symbol keys', () => {
+    const firstKey = Symbol('first');
+    const secondKey = Symbol('second');
+    const first = { a: 1, [firstKey]: 2, b: 3, [secondKey]: 4 };
+    const second = { [secondKey]: 4, b: 3, [firstKey]: 2, a: 1 };
+    assert.equal(deepEqual(first, second), true);
+    assert.equal(deepEqual(second, first), true);
+  });
+
+  it('keeps string keys distinct from Symbols with the same description', () => {
+    const key = Symbol('id');
+    assert.equal(deepEqual({ id: 1 }, { [key]: 1 }), false);
+    assert.equal(deepEqual({ [key]: 1 }, { id: 1 }), false);
+    assert.equal(deepEqual({ id: 1, [key]: 2 }, { id: 2, [key]: 1 }), false);
+  });
+
+  it('compares nested Symbol-keyed objects recursively', () => {
+    const key = Symbol('nested');
+    assert.equal(
+      deepEqual({ [key]: { values: [1] } }, { [key]: { values: [1] } }),
+      true,
+    );
+    assert.equal(
+      deepEqual({ [key]: { values: [1] } }, { [key]: { values: [2] } }),
+      false,
+    );
+  });
+
+  it('detects the nested Mrakomor Symbol-keyed component ID replacement', () => {
+    const COMPONENT_ID = Symbol.for('mrakomor.componentId');
+    const first = {
+      properties: { items: [{ text: 'Row', [COMPONENT_ID]: 'first' }] },
+    };
+    const second = {
+      properties: { items: [{ text: 'Row', [COMPONENT_ID]: 'second' }] },
+    };
+    assert.equal(deepEqual(first, second), false);
+    assert.equal(deepEqual(second, first), false);
+  });
+
+  it('compares enumerable Symbol properties on arrays', () => {
+    const key = Symbol('metadata');
+    const first = Object.assign([1], { [key]: { id: 'first' } });
+    const equal = Object.assign([1], { [key]: { id: 'first' } });
+    const changed = Object.assign([1], { [key]: { id: 'second' } });
+    assert.equal(deepEqual(first, equal), true);
+    assert.equal(deepEqual(first, changed), false);
+    assert.equal(deepEqual(changed, first), false);
+    assert.equal(deepEqual(first, [1]), false);
+    assert.equal(deepEqual([1], first), false);
+  });
+
+  it('ignores inherited and non-enumerable string and Symbol properties', () => {
+    const key = Symbol('hidden');
+    const first = Object.create({ [key]: 'first', inherited: 'first' });
+    const second = Object.create({ [key]: 'second', inherited: 'second' });
+    Object.defineProperties(first, {
+      [key]: { value: 'first' },
+      hidden: { value: 'first' },
+    });
+    Object.defineProperties(second, {
+      [key]: { value: 'second' },
+      hidden: { value: 'second' },
+    });
+    assert.equal(deepEqual(first, second), true);
+    assert.equal(deepEqual(second, first), true);
+    assert.equal(deepEqual(Object.create({ [key]: 1 }), {}), true);
+    assert.equal(deepEqual({}, Object.create({ [key]: 2 })), true);
+  });
+
+  it('requires matching enumerable key sets, not merely own descriptors', () => {
+    for (const [firstKey, secondKey] of [
+      ['x', 'y'],
+      [Symbol('x'), Symbol('y')],
+    ]) {
+      const first = Object.defineProperties(
+        {},
+        {
+          [firstKey]: { value: 1, enumerable: true },
+          [secondKey]: { value: 1 },
+        },
+      );
+      const second = Object.defineProperties(
+        {},
+        {
+          [firstKey]: { value: 1 },
+          [secondKey]: { value: 1, enumerable: true },
+        },
+      );
+      assert.equal(deepEqual(first, second), false);
+      assert.equal(deepEqual(second, first), false);
+    }
+  });
+
+  it('preserves accessor value reads with the owning object as receiver', () => {
+    for (const key of ['value', Symbol('value')]) {
+      const first = Object.defineProperty({ base: 2 }, key, {
+        enumerable: true,
+        get() {
+          return this.base;
+        },
+      });
+      const second = { base: 2, [key]: 2 };
+      const changed = { base: 2, [key]: 3 };
+      assert.equal(deepEqual(first, second), true);
+      assert.equal(deepEqual(second, first), true);
+      assert.equal(deepEqual(first, changed), false);
+    }
+  });
+
+  it('preserves sparse slots and same-reference Symbol mutation behavior', () => {
+    assert.equal(deepEqual(Array(1), [undefined]), false);
+    assert.equal(deepEqual([undefined], Array(1)), false);
+    const first = Array(2);
+    const second = Array(2);
+    first[1] = 1;
+    second[0] = 1;
+    assert.equal(deepEqual(first, second), false);
+    const key = Symbol('id');
+    const shared = { [key]: 'first' };
+    shared[key] = 'second';
+    assert.equal(deepEqual(shared, shared), true);
+  });
 });
 
 // ---------------------------------------------------------------------------
